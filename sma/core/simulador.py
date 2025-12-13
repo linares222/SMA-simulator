@@ -21,6 +21,7 @@ class MotorDeSimulacao:
         self.registador_resultados = RegistadorResultados()
         self.visualizador = None
         self.diretorio_qtables: Optional[str] = None
+        self._comunicacao_ativa = True
 
     @staticmethod
     def cria(cfg_path: str) -> "MotorDeSimulacao":
@@ -31,6 +32,21 @@ class MotorDeSimulacao:
         sim.max_passos = cfg.get("max_passos", 200)
         sim.modo = cfg.get("modo_execucao", ModoExecucao.TESTE)
         return sim
+
+    def listaAgentes(self) -> List[Agente]:
+        """Retorna a lista de agentes no simulador."""
+        return self.agentes
+    
+    def enviar_mensagem(self, de_agente: Agente, para_agente: Agente, mensagem: str):
+        """Envia uma mensagem de um agente para outro."""
+        if para_agente in self.agentes:
+            para_agente.comunica(mensagem, de_agente)
+    
+    def broadcast_mensagem(self, de_agente: Agente, mensagem: str, excluir_remetente: bool = True):
+        """Envia uma mensagem de um agente para todos os outros agentes."""
+        for ag in self.agentes:
+            if not excluir_remetente or ag != de_agente:
+                ag.comunica(mensagem, de_agente)
 
     def _propagar_modo(self):
         for ag in self.agentes:
@@ -116,6 +132,8 @@ class MotorDeSimulacao:
 
                     if hasattr(self.ambiente, '_agentes'):
                         self.ambiente._agentes = self.agentes
+                    if hasattr(self.ambiente, '_simulador'):
+                        self.ambiente._simulador = self
                     
                     for ag in self.agentes:
                         accao = ag._accao_pronta
@@ -123,6 +141,11 @@ class MotorDeSimulacao:
                         recomp = self.ambiente.agir(accao, ag)
                         novo_obs = ag.observar(self.ambiente)
                         ag.observacao(novo_obs)
+                        
+                        # Processar comunicação após ação
+                        if self._comunicacao_ativa and hasattr(ag, 'processar_comunicacao'):
+                            ag.processar_comunicacao(self, self.ambiente)
+                        
                         ag.avaliacaoEstadoAtual(recomp)
                         val_dep = getattr(self.ambiente, 'get_ultimo_valor_depositado', lambda: 0.0)()
                         self.registador_resultados.registar_passo(recomp, val_dep)

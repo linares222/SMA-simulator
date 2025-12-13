@@ -187,11 +187,19 @@ class PoliticaFixaInteligente(Politica):
 
 class PoliticaQLearning(Politica):
     def __init__(self, acoes: Tuple[TipoAccao, ...], alfa=0.2, gama=0.95, epsilon=0.1):
+        # Q-table: guarda o valor de cada ação em cada estado
         self.Q: Dict[Any, Dict[TipoAccao, float]] = {}
         self.acoes = acoes
+        
+        # alfa: velocidade de aprendizagem (0.1-0.5, mais alto = aprende mais rápido)
         self.alfa = alfa
+        
+        # gama: importância de recompensas futuras (0.8-0.99, mais alto = pensa mais à frente)
         self.gama = gama
+        
+        # epsilon: probabilidade de ação aleatória (0.05-0.4, mais alto = explora mais)
         self.eps = epsilon
+        
         self._modo = ModoExecucao.APRENDIZAGEM
 
     def _key(self, obs: Observacao) -> Any:
@@ -204,13 +212,17 @@ class PoliticaQLearning(Politica):
         k = self._key(estado)
         self.Q.setdefault(k, {a: 0.0 for a in self.acoes})
         
+        # Epsilon-greedy: durante aprendizagem, às vezes escolhe ação aleatória (explora)
+        # A probabilidade é controlada por self.eps
         if self._modo == ModoExecucao.APRENDIZAGEM and random.random() < self.eps:
             a = random.choice(self.acoes)
         else:
+            # Escolhe a ação com maior valor Q (a melhor que conhece)
             a = max(self.Q[k], key=self.Q[k].get)
         return Accao(a)
 
     def atualizar(self, estado: Observacao, accao: Accao, recompensa: float, prox_estado: Observacao):
+        # Só atualiza durante aprendizagem
         if self._modo != ModoExecucao.APRENDIZAGEM:
             return
         
@@ -219,6 +231,7 @@ class PoliticaQLearning(Politica):
         self.Q.setdefault(k, {a: 0.0 for a in self.acoes})
         self.Q.setdefault(k2, {a: 0.0 for a in self.acoes})
         
+        # Fórmula Q-Learning: Q(novo) = Q(antigo) + alfa * (recompensa + gama * melhor_Q_futuro - Q(antigo))
         qsa = self.Q[k][accao.tipo]
         alvo = recompensa + self.gama * max(self.Q[k2].values())
         self.Q[k][accao.tipo] = qsa + self.alfa * (alvo - qsa)
@@ -226,6 +239,7 @@ class PoliticaQLearning(Politica):
     def set_modo(self, modo: str):
         self._modo = modo
         if modo == ModoExecucao.TESTE:
+            # Em teste, epsilon = 0 (só usa o que aprendeu, sem exploração)
             self.eps = 0.0
 
     def guardar(self, caminho: str):

@@ -20,6 +20,7 @@ class Agente(threading.Thread, ABC):
         self._ativo = True
         self._estado_anterior: Observacao = None
         self._accao_anterior: Accao = None
+        self._mensagens_recebidas: List = []
 
     def instala(self, sensor):
         self.sensores.append(sensor)
@@ -40,6 +41,23 @@ class Agente(threading.Thread, ABC):
 
     def observacao(self, obs: Observacao):
         self._observacao_atual = obs
+
+    def comunica(self, mensagem: str, de_agente: "Agente"):
+        """Recebe uma mensagem de outro agente."""
+        self._mensagens_recebidas.append({
+            "mensagem": mensagem,
+            "de_agente": de_agente
+        })
+    
+    def obter_mensagens(self) -> List[dict]:
+        """Retorna todas as mensagens recebidas e limpa a lista."""
+        mensagens = list(self._mensagens_recebidas)
+        self._mensagens_recebidas.clear()
+        return mensagens
+    
+    def tem_mensagens(self) -> bool:
+        """Verifica se há mensagens pendentes."""
+        return len(self._mensagens_recebidas) > 0
 
     @abstractmethod
     def age(self) -> Accao:
