@@ -1,174 +1,174 @@
-# Simulador Multi-Agente
+# Multi-Agent Simulator
 
-Implementação de um simulador de sistemas multi-agente com Q-Learning para ambientes de navegação e forrageamento.
+Implementation of a multi-agent system simulator with Q-Learning for navigation and foraging environments.
 
-## 📋 Características
+## Features
 
-- **Q-Learning**: Implementação completa de aprendizagem por reforço
-- **Multi-agente**: Suporte para múltiplos agentes simultâneos
-- **Dois ambientes**: Farol (navegação) e Foraging (coleta de recursos)
-- **CLI interativo**: Interface amigável para configuração e execução
-- **Análise de resultados**: Geração automática de gráficos e métricas
-- **Políticas mistas**: Comparação entre agentes com Q-Learning e políticas fixas
-- **Visualização**: Representação gráfica dos ambientes e agentes
+- **Q-Learning**: Complete reinforcement learning implementation
+- **Multi-agent**: Support for multiple simultaneous agents
+- **Two environments**: Lighthouse (navigation) and Foraging (resource collection)
+- **Interactive CLI**: User-friendly interface for configuration and execution
+- **Results analysis**: Automatic generation of graphs and metrics
+- **Mixed policies**: Comparison between Q-Learning agents and fixed policies
+- **Visualization**: Graphical representation of environments and agents
 
-## 🚀 Requisitos
+## Requirements
 
 - Python 3.10+
 - NumPy >= 1.21.0
 - Matplotlib >= 3.5.0
 - Questionary >= 2.0.0
 
-### Instalação
+### Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-O script `run.sh` instala automaticamente as dependências se necessário.
+The `run.sh` script automatically installs dependencies if needed.
 
-## 🎮 Como Executar
+## How to Run
 
-### CLI Interativo (Recomendado)
+### Interactive CLI (Recommended)
 
-O simulador inclui uma interface interativa que guia o utilizador através de todas as opções:
+The simulator includes an interactive interface that guides the user through all options:
 
 ```bash
 ./run.sh
 ```
 
-O CLI permite configurar:
-- **Ambiente:** FAROL ou FORAGING
-- **Modo:** APRENDIZAGEM (treinar) ou TESTE (avaliar política treinada)
-- **Número de agentes:** Quantidade total de agentes na simulação
-- **Distribuição:** Quantos agentes usam Q-Learning vs política fixa
-- **Episódios:** Número de episódios a executar
-- **Max passos:** Número máximo de passos por episódio
-- **Gráficos:** Selecionar quais gráficos gerar no final
+The CLI allows you to configure:
+- **Environment:** LIGHTHOUSE or FORAGING
+- **Mode:** LEARNING (train) or TEST (evaluate trained policy)
+- **Number of agents:** Total number of agents in the simulation
+- **Distribution:** How many agents use Q-Learning vs fixed policy
+- **Episodes:** Number of episodes to run
+- **Max steps:** Maximum number of steps per episode
+- **Graphs:** Select which graphs to generate at the end
 
-**Funcionalidades:**
-- ✅ Ativa automaticamente o ambiente virtual Python
-- ✅ Executa simulação principal sem visualização (mais rápido)
-- ✅ Mostra visualização apenas no episódio final
-- ✅ Gera e abre automaticamente gráficos de análise
-- ✅ Guarda resultados em CSV
-- ✅ Suporta cancelamento com `Ctrl+C`
+**Features:**
+- Automatically activates Python virtual environment
+- Runs main simulation without visualization (faster)
+- Shows visualization only on the final episode
+- Automatically generates and opens analysis graphs
+- Saves results to CSV
+- Supports cancellation with `Ctrl+C`
 
-### Modo Manual (Legado)
+### Manual Mode (Legacy)
 
 ```bash
-# ambiente farol (default)
-python -m sma.run farol
+# lighthouse environment (default)
+python -m sma.run lighthouse
 
-# ambiente foraging
+# foraging environment
 python -m sma.run foraging
 
-# com visualização
-python -m sma.run farol --visual
+# with visualization
+python -m sma.run lighthouse --visual
 
-# especificar número de episódios
+# specify number of episodes
 python -m sma.run foraging -e 200
 
-# guardar resultados
-python -m sma.run farol -o resultados.csv
+# save results
+python -m sma.run lighthouse -o results.csv
 ```
 
-## 📁 Estrutura do Projeto
+## Project Structure
 
 ```
 sma/
-  core/              # Classes base (agente, ambiente, simulador)
-    - agente_base.py      # Classe abstrata de agente
-    - ambiente_base.py    # Classe abstrata de ambiente
-    - simulador.py        # Motor de simulação
-    - politicas.py        # Implementação de Q-Learning
-    - sensores.py         # Sistema de sensores
-    - visualizador.py     # Visualização gráfica
-    - resultados.py       # Gestão de métricas
-  agentes/           # Implementações dos agentes
-    - agente_farol.py     # Agente para ambiente Farol
-    - agente_forager.py   # Agente para ambiente Foraging
-  ambientes/         # Implementações dos ambientes
-    - farol.py            # Ambiente de navegação ao farol
-    - foraging.py         # Ambiente de forrageamento
-  cli.py             # Interface interativa (CLI)
-  comparar_politicas.py  # Comparação de políticas
-  gerar_analise.py   # Geração de análises e gráficos
-  config_*.json      # Ficheiros de configuração
-  resultados/        # Resultados exportados (CSV)
-  analise/           # Gráficos gerados (PNG)
-  qtables/           # Q-tables guardadas (JSON)
-run.sh               # Script para executar CLI
-requirements.txt     # Dependências Python
+  core/              # Base classes (agent, environment, simulator)
+    - agente_base.py      # Abstract agent class
+    - ambiente_base.py    # Abstract environment class
+    - simulador.py        # Simulation engine
+    - politicas.py        # Q-Learning implementation
+    - sensores.py         # Sensor system
+    - visualizador.py     # Graphical visualization
+    - resultados.py       # Metrics management
+  agentes/           # Agent implementations
+    - agente_farol.py     # Agent for Lighthouse environment
+    - agente_forager.py   # Agent for Foraging environment
+  ambientes/         # Environment implementations
+    - farol.py            # Lighthouse navigation environment
+    - foraging.py         # Foraging environment
+  cli.py             # Interactive interface (CLI)
+  comparar_politicas.py  # Policy comparison
+  gerar_analise.py   # Analysis and graph generation
+  config_*.json      # Configuration files
+  resultados/        # Exported results (CSV)
+  analise/           # Generated graphs (PNG)
+  qtables/           # Saved Q-tables (JSON)
+run.sh               # Script to run CLI
+requirements.txt     # Python dependencies
 ```
 
-## 🌍 Ambientes
+## Environments
 
-### Farol
-Agentes têm de navegar até ao farol usando Q-Learning. Recebem a direção relativa ao farol como observação através de sensores. O objetivo é alcançar o farol no menor número de passos possível.
+### Lighthouse
+Agents must navigate to the lighthouse using Q-Learning. They receive the relative direction to the lighthouse as observation through sensors. The goal is to reach the lighthouse in the minimum number of steps.
 
-**Características:**
-- Observação: Direção relativa ao farol
-- Ações: Mover nas 4 direções (Norte, Sul, Este, Oeste)
-- Recompensa: Positiva ao alcançar o farol, negativa por passos sem progresso
+**Characteristics:**
+- Observation: Relative direction to lighthouse
+- Actions: Move in 4 directions (North, South, East, West)
+- Reward: Positive when reaching the lighthouse, negative for steps without progress
 
 ### Foraging
-Agentes recolhem recursos e depositam no ninho. Ambiente mais complexo que envolve coletar recursos e depositá-los no ninho.
+Agents collect resources and deposit them in the nest. More complex environment that involves collecting resources and depositing them in the nest.
 
-**Características:**
-- Observação: Estado do agente (com/sem recurso), posição relativa ao ninho e recursos
-- Ações: Mover, coletar recursos, depositar no ninho
-- Recompensa: Baseada no valor dos recursos depositados
+**Characteristics:**
+- Observation: Agent state (with/without resource), relative position to nest and resources
+- Actions: Move, collect resources, deposit in nest
+- Reward: Based on the value of deposited resources
 
-## ⚙️ Configuração
+## Configuration
 
-### Via CLI Interativo
+### Via Interactive CLI
 
-O CLI gera automaticamente a configuração baseada nas escolhas do utilizador. Não é necessário editar ficheiros JSON manualmente.
+The CLI automatically generates configuration based on user choices. It is not necessary to edit JSON files manually.
 
-### Via Ficheiros JSON (Modo Manual)
+### Via JSON Files (Manual Mode)
 
-Os ficheiros `config_*.json` definem os parâmetros da simulação:
-- `modo_execucao`: APRENDIZAGEM ou TESTE
-- `episodios`: Número de episódios
-- `max_passos`: Passos por episódio
+The `config_*.json` files define simulation parameters:
+- `modo_execucao`: LEARNING or TEST
+- `episodios`: Number of episodes
+- `max_passos`: Steps per episode
 - `visualizar`: true/false
-- Parâmetros do ambiente e agentes
+- Environment and agent parameters
 
-## 📊 Análise de Resultados
+## Results Analysis
 
-O simulador gera automaticamente:
-- **Curvas de aprendizagem**: Evolução da recompensa ao longo dos episódios
-- **Métricas de desempenho**: Taxa de sucesso, passos médios, recompensas
-- **Comparação de políticas**: Q-Learning vs políticas fixas
-- **Exportação CSV**: Dados brutos para análise externa
+The simulator automatically generates:
+- **Learning curves**: Reward evolution over episodes
+- **Performance metrics**: Success rate, average steps, rewards
+- **Policy comparison**: Q-Learning vs fixed policies
+- **CSV export**: Raw data for external analysis
 
-Consulte `ANALISE_RESULTADOS.md` para mais detalhes sobre análise de resultados.
+See `ANALISE_RESULTADOS.md` for more details on results analysis.
 
-## 📚 Documentação Adicional
+## Additional Documentation
 
-- `relatorio.md`: Relatório técnico completo da arquitetura e implementação
-- `CODE_REVIEW.md`: Revisão de código e melhorias
-- `ANALISE_RESULTADOS.md`: Guia de análise de resultados
-- `TESTES_REALIZADOS.md`: Documentação de testes realizados
+- `relatorio.md`: Complete technical report on architecture and implementation
+- `CODE_REVIEW.md`: Code review and improvements
+- `ANALISE_RESULTADOS.md`: Results analysis guide
+- `TESTES_REALIZADOS.md`: Test documentation
 
-## 🔧 Desenvolvimento
+## Development
 
-### Estrutura Modular
+### Modular Structure
 
-O projeto segue uma arquitetura modular:
-- **Core**: Componentes base reutilizáveis
-- **Agentes**: Implementações específicas por ambiente
-- **Ambientes**: Definições dos espaços de simulação
-- **Políticas**: Algoritmos de aprendizagem (Q-Learning)
+The project follows a modular architecture:
+- **Core**: Reusable base components
+- **Agents**: Environment-specific implementations
+- **Environments**: Simulation space definitions
+- **Policies**: Learning algorithms (Q-Learning)
 
-### Extensibilidade
+### Extensibility
 
-Para adicionar novos ambientes ou agentes:
-1. Criar classe que herda de `Ambiente` ou `Agente`
-2. Implementar métodos obrigatórios
-3. Adicionar configuração JSON correspondente
+To add new environments or agents:
+1. Create a class that inherits from `Ambiente` or `Agente`
+2. Implement required methods
+3. Add corresponding JSON configuration
 
-## 📄 Licença
+## License
 
-Este é um projeto desenvolvido para fins educacionais.
+This is a project developed for educational purposes.
