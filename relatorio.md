@@ -9,7 +9,8 @@
 6. [Políticas](#políticas)
 7. [Modos de Operação](#modos-de-operação)
 8. [Sincronização e Threads](#sincronização-e-threads)
-9. [Métricas de Desempenho](#métricas-de-desempenho)
+9. [Comunicação entre Agentes](#comunicação-entre-agentes)
+10. [Métricas de Desempenho](#métricas-de-desempenho)
 
 ---
 
@@ -32,6 +33,7 @@ O motor de simulação gere o ciclo de tempo e a ordem de execução das ações
 - Registo de resultados e métricas
 - Suporte para visualização
 - Gestão de políticas (guardar/carregar Q-tables)
+- Sistema de comunicação entre agentes (enviar_mensagem, broadcast_mensagem)
 
 ### 2. Ambiente Base (`Ambiente`)
 
@@ -53,6 +55,8 @@ Classe abstrata que implementa a interface de agente como uma thread independent
 - `avaliacaoEstadoAtual(recompensa: float)`: Recebe a recompensa e atualiza a política
 - `instala(sensor: Sensor)`: Instala um sensor no agente
 - `comunica(mensagem: String, de_agente: Agente)`: Permite comunicação entre agentes
+- `obter_mensagens() -> List[dict]`: Retorna todas as mensagens recebidas e limpa a lista
+- `tem_mensagens() -> bool`: Verifica se há mensagens pendentes
 
 ---
 
@@ -405,7 +409,13 @@ Os agentes são implementados como threads independentes (`threading.Thread`), p
 
 **Políticas suportadas:**
 - `PoliticaFixa`: Sempre executa a mesma ação
+- `PoliticaFixaInteligente`: Usa heurísticas baseadas em observações
 - `PoliticaQLearning`: Aprendizagem por reforço
+
+**Comunicação:**
+- Implementa `processar_comunicacao()` que envia mensagens quando encontra o farol ou quando está próximo de outros agentes
+- Usa `broadcast_mensagem()` para notificar todos os agentes quando encontra o farol
+- Usa `enviar_mensagem()` para comunicação direta com agentes próximos (distância <= 2)
 
 #### 2. `AgenteForager`
 
@@ -422,7 +432,13 @@ Os agentes são implementados como threads independentes (`threading.Thread`), p
 
 **Políticas suportadas:**
 - `PoliticaFixa`: Sempre executa a mesma ação
+- `PoliticaFixaInteligente`: Usa heurísticas baseadas em observações
 - `PoliticaQLearning`: Aprendizagem por reforço
+
+**Comunicação:**
+- Implementa `processar_comunicacao()` que envia mensagens quando coleta recursos, deposita no ninho, ou quando está próximo de outros agentes
+- Usa `broadcast_mensagem()` para notificar todos os agentes sobre eventos importantes (coleta, depósito)
+- Usa `enviar_mensagem()` para comunicação direta com agentes próximos (distância <= 2)
 
 ---
 
@@ -931,6 +947,55 @@ Para cada passo:
 - **Extensibilidade:** Fácil adicionar novos tipos de agentes
 - **Paralelização:** Preparado para execução paralela (embora atualmente sequencial no ambiente)
 - **Sincronização:** Garante consistência do estado
+
+---
+
+## Comunicação entre Agentes
+
+### Sistema de Comunicação
+
+O simulador implementa um sistema de comunicação entre agentes que permite troca de mensagens durante a simulação.
+
+### Interface de Comunicação
+
+**No Agente:**
+- `comunica(mensagem: str, de_agente: Agente)`: Recebe uma mensagem de outro agente e armazena na fila de mensagens
+- `obter_mensagens() -> List[dict]`: Retorna todas as mensagens recebidas e limpa a lista
+- `tem_mensagens() -> bool`: Verifica se há mensagens pendentes
+- `processar_comunicacao(simulador, ambiente)`: Método opcional que os agentes podem implementar para processar eventos e enviar mensagens
+
+**No Simulador:**
+- `enviar_mensagem(de_agente: Agente, para_agente: Agente, mensagem: str)`: Envia uma mensagem de um agente para outro específico
+- `broadcast_mensagem(de_agente: Agente, mensagem: str, excluir_remetente: bool = True)`: Envia uma mensagem de um agente para todos os outros agentes
+
+### Funcionamento
+
+1. **Processamento de Comunicação:**
+   - Após cada ação, o simulador chama `processar_comunicacao()` em cada agente (se implementado)
+   - Os agentes podem decidir enviar mensagens baseadas em eventos ou proximidade
+
+2. **Armazenamento:**
+   - Mensagens recebidas são armazenadas na fila `_mensagens_recebidas` de cada agente
+   - Cada mensagem contém o texto e o agente remetente
+
+3. **Uso pelas Políticas:**
+   - As políticas podem acessar mensagens através de `obter_mensagens()` ou `tem_mensagens()`
+   - Permite implementar comportamentos coordenados ou cooperativos
+
+### Exemplos de Uso
+
+**AgenteFarol:**
+- Envia broadcast quando encontra o farol
+- Envia mensagem direta para agentes próximos (distância <= 2) com sua posição e direção do farol
+
+**AgenteForager:**
+- Envia broadcast quando coleta um recurso
+- Envia broadcast quando deposita recursos no ninho
+- Envia mensagem direta para agentes próximos (distância <= 2) com sua posição e estado (carregando ou livre)
+
+### Ativação/Desativação
+
+A comunicação pode ser controlada através do atributo `_comunicacao_ativa` do simulador (padrão: `True`). Quando desativada, `processar_comunicacao()` não é chamado.
 
 ---
 

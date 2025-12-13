@@ -28,7 +28,7 @@ class Visualizador2D:
 
         if hasattr(ambiente, "obstaculos") and ambiente.obstaculos:
             for ox, oy in ambiente.obstaculos:
-                self.ax.scatter([ox], [oy], c="dimgray", marker="s", s=250, zorder=2)
+                self.ax.scatter([ox], [oy], c="black", marker="s", s=300, zorder=2, edgecolors="darkgray", linewidths=1)
 
         if hasattr(ambiente, "pos_farol"):
             x, y = ambiente.pos_farol

@@ -283,7 +283,8 @@ def gerar_config_dinamico(
                     "tipo": "FAROL",
                     "largura": 10,
                     "altura": 8,
-                    "pos_farol": [7, 6]
+                    "pos_farol": [7, 6],
+                    "obstaculos": [[3, 3], [4, 4], [5, 3], [2, 5], [6, 2]]
                 }
             }
         else:

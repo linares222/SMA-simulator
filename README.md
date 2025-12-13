@@ -11,6 +11,7 @@ Implementation of a multi-agent system simulator with Q-Learning for navigation 
 - **Results analysis**: Automatic generation of graphs and metrics
 - **Mixed policies**: Comparison between Q-Learning agents and fixed policies
 - **Visualization**: Graphical representation of environments and agents
+- **Agent communication**: Message passing system between agents (broadcast and direct messaging)
 
 ## Requirements
 
@@ -222,6 +223,16 @@ To add new environments or agents:
 1. Create a class that inherits from `Ambiente` or `Agente`
 2. Implement required methods
 3. Add corresponding JSON configuration
+
+### Agent Communication
+
+The simulator includes a communication system that allows agents to exchange messages:
+- **Direct messaging**: `simulador.enviar_mensagem()` sends a message to a specific agent
+- **Broadcast**: `simulador.broadcast_mensagem()` sends a message to all agents
+- Agents can implement `processar_comunicacao()` to send messages based on events or proximity
+- Messages are stored in each agent's message queue and can be accessed via `obter_mensagens()`
+
+See `relatorio.md` for detailed documentation on the communication system.
 
 ## License
 
