@@ -143,14 +143,9 @@ The simulator automatically generates:
 - **Policy comparison**: Q-Learning vs fixed policies
 - **CSV export**: Raw data for external analysis
 
-See `ANALISE_RESULTADOS.md` for more details on results analysis.
-
 ## Additional Documentation
 
 - `relatorio.md`: Complete technical report on architecture and implementation
-- `CODE_REVIEW.md`: Code review and improvements
-- `ANALISE_RESULTADOS.md`: Results analysis guide
-- `TESTES_REALIZADOS.md`: Test documentation
 
 ## Development
 
