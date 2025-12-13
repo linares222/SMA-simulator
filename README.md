@@ -38,6 +38,7 @@ The simulator includes an interactive interface that guides the user through all
 ```
 
 The CLI allows you to configure:
+- **Operation mode:** Execute simulation or compare policies
 - **Environment:** FAROL or FORAGING
 - **Mode:** LEARNING (train) or TEST (evaluate trained policy)
 - **Number of agents:** Total number of agents in the simulation
@@ -45,6 +46,14 @@ The CLI allows you to configure:
 - **Episodes:** Number of episodes to run
 - **Max steps:** Maximum number of steps per episode
 - **Graphs:** Select which graphs to generate at the end
+
+**Policy Comparison Mode:**
+- Compares Fixed Intelligent policy vs Q-Learning
+- Automatically detects available Q-tables for the selected environment
+- Limits Q-Learning agents to the number of available Q-tables
+- Executes both policies with the same configuration
+- Generates comparative graphs showing both policies side-by-side
+- Exports separate CSV files for each policy
 
 **Features:**
 - Automatically activates Python virtual environment
@@ -140,8 +149,32 @@ The `config_*.json` files define simulation parameters:
 The simulator automatically generates:
 - **Learning curves**: Reward evolution over episodes
 - **Performance metrics**: Success rate, average steps, rewards
-- **Policy comparison**: Q-Learning vs fixed policies
+- **Policy comparison**: Q-Learning vs fixed policies with side-by-side graphs
 - **CSV export**: Raw data for external analysis
+
+### Policy Comparison
+
+Compare Fixed Intelligent policy with Q-Learning:
+
+```bash
+# Via CLI (interactive)
+./run.sh
+# Select "Comparar politicas (Fixa Inteligente vs Q-Learning)"
+
+# Via command line
+python -m sma.comparar_politicas config_farol.json --episodios 10
+```
+
+**Q-table Management:**
+- Q-tables are always saved to `sma/qtables/` after training (overwrites existing ones)
+- The comparison script automatically detects how many Q-tables exist for the environment
+- Limits Q-Learning agents to the number of available Q-tables
+- Remaining agents use Fixed Intelligent policy
+
+This generates:
+- Comparative statistics in terminal
+- Two CSV files (one for each policy)
+- Comparative graphs showing 6 metrics side-by-side
 
 ## Additional Documentation
 

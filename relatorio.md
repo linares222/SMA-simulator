@@ -81,25 +81,31 @@ O CLI guia o utilizador através de uma série de perguntas:
    - FAROL: Navegação até ao farol
    - FORAGING: Recolha e depósito de recursos
 
-2. **Modo de Execução:**
+2. **Modo de Operação:**
+   - Executar simulação: Modo normal de simulação
+   - Comparar políticas: Compara política fixa inteligente vs Q-Learning
+
+3. **Modo de Execução (se simulação normal):**
    - APRENDIZAGEM: Treinar agentes com Q-Learning
    - TESTE: Avaliar políticas pré-treinadas
 
-3. **Número de Agentes:**
+4. **Número de Agentes:**
    - Quantidade total de agentes na simulação
 
-4. **Distribuição de Políticas:**
+5. **Distribuição de Políticas (se simulação normal):**
    - **Modo APRENDIZAGEM:** Quantos agentes usam Q-Learning vs política fixa
    - **Modo TESTE:** Quantos agentes usam Q-table treinada vs política fixa
+   - O CLI mostra quantas Q-tables estão disponíveis para o ambiente
+   - Limita o número de agentes com Q-Learning ao número de Q-tables disponíveis
 
-5. **Episódios:**
+6. **Episódios:**
    - Número de episódios a executar (padrão: 100)
 
-6. **Máximo de Passos:**
+7. **Máximo de Passos:**
    - Número máximo de passos por episódio (padrão: 200)
    - Controla quando um episódio termina por timeout
 
-7. **Gráficos:**
+8. **Gráficos (se simulação normal):**
    - Seleção de quais gráficos gerar no final:
      - Curva de Aprendizagem (Recompensa)
      - Passos por Episódio
@@ -734,12 +740,17 @@ Q = {
 
 **Guardar Q-table:**
 - Guardada em JSON após cada episódio em modo APRENDIZAGEM
+- Sempre guardada em `sma/qtables/` (independentemente do local do ficheiro de configuração)
 - Formato: `qtable_{agente_id}.json`
 - Inclui: Q-values, ações, parâmetros (alfa, gama, epsilon)
+- Sobrepõe Q-tables existentes com o mesmo ID
+- Mostra mensagem resumo: "Total: X Q-table(s) guardada(s) de Y agente(s)"
 
 **Carregar Q-table:**
 - Carregada automaticamente em modo TESTE
+- Carregada de `sma/qtables/` (localização fixa)
 - Permite usar política treinada sem re-treinar
+- Se Q-table não existir para um agente Q-Learning em modo TESTE, o agente usa política fixa inteligente como fallback
 
 #### Vantagens e Limitações
 
@@ -783,7 +794,8 @@ Q = {
 ```bash
 # Treinar agente (modifica Q-table durante execução)
 python -m sma.run farol --episodios 100
-# Q-table é guardada em: qtables/qtable_AgenteFarol_0.json
+# Q-table é guardada em: sma/qtables/qtable_AgenteFarol_0.json
+# Se já existir, é sobreposta
 ```
 
 ### Modo TESTE
@@ -814,7 +826,7 @@ python -m sma.run farol --episodios 100
 ```bash
 # Testar política treinada (usa Q-table existente, não a modifica)
 python -m sma.run farol --episodios 10
-# Q-table é carregada de: qtables/qtable_AgenteFarol_0.json
+# Q-table é carregada de: sma/qtables/qtable_AgenteFarol_0.json
 # Q-table NÃO é modificada durante a execução
 # Q-table NÃO é guardada no final
 ```
@@ -1088,24 +1100,43 @@ analise/
 
 ### Objetivo
 
-O simulador permite comparar o desempenho entre políticas fixas (pré-programadas) e políticas aprendidas (Q-Learning), permitindo avaliar se a aprendizagem melhorou o desempenho do agente.
+O simulador permite comparar o desempenho entre políticas fixas inteligentes (pré-programadas) e políticas aprendidas (Q-Learning), permitindo avaliar se a aprendizagem melhorou o desempenho do agente.
 
 ### Script de Comparação
 
 Foi implementado o script `comparar_politicas.py` que:
 
-1. **Executa com política fixa:** Cria agentes com `PoliticaFixa` que sempre executam a mesma ação
-2. **Executa com política aprendida:** Carrega Q-tables pré-treinadas e executa em modo TESTE (sem exploração)
+1. **Executa com política fixa inteligente:** Cria agentes com `PoliticaFixaInteligente` que usam heurísticas baseadas em observações
+2. **Executa com política aprendida:** 
+   - Lê quantas Q-tables existem para o ambiente em `sma/qtables/`
+   - Limita o número de agentes com Q-Learning ao número de Q-tables disponíveis
+   - Agentes restantes usam política fixa inteligente
+   - Carrega Q-tables pré-treinadas e executa em modo TESTE (sem exploração, epsilon=0)
 3. **Compara resultados:** Mostra diferenças em todas as métricas
+4. **Gera gráficos comparativos:** Cria visualizações lado a lado com 6 métricas diferentes
+
+**Gestão de Q-tables:**
+- O script verifica automaticamente quantas Q-tables existem para o ambiente selecionado
+- Se houver menos Q-tables do que agentes, apenas os primeiros agentes usam Q-Learning
+- Mostra avisos quando há menos Q-tables do que agentes solicitados
 
 ### Uso
 
+**Via CLI Interativo:**
+```bash
+./run.sh
+# Escolher "Comparar politicas (Fixa Inteligente vs Q-Learning)"
+```
+
+**Via Linha de Comando:**
 ```bash
 # Primeiro, treinar a política (modo APRENDIZAGEM)
 python -m sma.run farol --episodios 100
+# Q-tables são guardadas em sma/qtables/
 
 # Depois, comparar políticas
 python -m sma.comparar_politicas config_farol.json --episodios 10
+# O script lê quantas Q-tables existem para o ambiente e limita o número de agentes com Q-Learning
 ```
 
 ### Métricas Comparadas
@@ -1139,10 +1170,27 @@ ANÁLISE:
 ### Exportação de Resultados
 
 O script exporta automaticamente:
-- `resultados_fixa.csv`: Resultados da política fixa
-- `resultados_aprendida.csv`: Resultados da política aprendida
+- `resultados_fixa.csv`: Resultados da política fixa inteligente
+- `resultados_aprendida.csv`: Resultados da política aprendida (Q-Learning)
+- `comparacao_politicas.png`: Gráfico comparativo com 6 subgráficos
 
-Estes ficheiros podem ser usados para análise estatística mais detalhada ou visualização.
+### Gráficos Comparativos
+
+O script gera automaticamente um gráfico comparativo mostrando:
+
+1. **Passos médios (barra):** Comparação direta com barras de erro
+2. **Evolução dos passos (linha):** Ambas as políticas ao longo dos episódios
+3. **Taxa de sucesso (barra):** Comparação percentual
+4. **Recompensa média (barra):** Comparação com barras de erro
+5. **Evolução da recompensa (linha):** Ambas as políticas ao longo dos episódios
+6. **Evolução da recompensa descontada (linha):** Ambas as políticas ao longo dos episódios
+
+Cada gráfico de evolução mostra:
+- Valores reais (linhas transparentes)
+- Média móvel (linhas destacadas)
+- Ambas as políticas no mesmo gráfico para comparação direta
+
+Os ficheiros CSV podem ser usados para análise estatística mais detalhada ou visualização personalizada.
 
 ---
 

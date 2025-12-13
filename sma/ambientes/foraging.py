@@ -113,15 +113,16 @@ class AmbienteForaging(Ambiente):
             else:
                 return -2.0
 
-        if not self.recursos:
-            cargas = [getattr(a, "carregando", 0) for a in getattr(self, "_agentes", [agente])]
-            if not any(cargas):
-                self.terminou = True
-
         return recomp
     
     def get_ultimo_valor_depositado(self) -> float:
         return self._ultimo_valor_depositado
+
+    def verificar_termino(self, agentes):
+        if not self.recursos:
+            cargas = [getattr(a, "carregando", 0) for a in agentes]
+            if not any(cargas):
+                self.terminou = True
 
     def atualizacao(self):
         pass

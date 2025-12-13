@@ -115,7 +115,11 @@ def carregar_simulacao(cfg_path, visual=None, episodios=None):
         sim.visualizador = Visualizador2D()
     
     sim.modo = modo
-    sim.diretorio_qtables = cfg.get("diretorio_qtables", str(Path(cfg_path).parent / "qtables"))
+    
+    if "diretorio_qtables" in cfg:
+        sim.diretorio_qtables = cfg["diretorio_qtables"]
+    else:
+        sim.diretorio_qtables = str(Path(__file__).parent / "qtables")
     
     return sim
 

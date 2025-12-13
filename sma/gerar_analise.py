@@ -145,8 +145,8 @@ def gerar_comparacao(caminho_fixa: str, caminho_aprendida: str, output_dir: Path
         print("Dados insuficientes para comparação")
         return
     
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle('Comparação: Política Fixa vs Política Aprendida', fontsize=16, fontweight='bold')
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle('Comparação: Política Fixa Inteligente vs Q-Learning', fontsize=16, fontweight='bold')
     
     ep_fixa = [d['episodio'] for d in dados_fixa]
     ep_aprendida = [d['episodio'] for d in dados_aprendida]
@@ -157,58 +157,85 @@ def gerar_comparacao(caminho_fixa: str, caminho_aprendida: str, output_dir: Path
     recomp_fixa = [d['recompensa_total'] for d in dados_fixa]
     recomp_aprendida = [d['recompensa_total'] for d in dados_aprendida]
     
+    recomp_desc_fixa = [d['recompensa_descontada'] for d in dados_fixa]
+    recomp_desc_aprendida = [d['recompensa_descontada'] for d in dados_aprendida]
+    
     sucesso_fixa = [1 if d['sucesso'] else 0 for d in dados_fixa]
     sucesso_aprendida = [1 if d['sucesso'] else 0 for d in dados_aprendida]
     
-    # 1. Passos médios
     ax1 = axes[0, 0]
-    ax1.bar(['Fixa', 'Aprendida'], 
+    ax1.bar(['Fixa Inteligente', 'Q-Learning'], 
             [np.mean(passos_fixa), np.mean(passos_aprendida)],
             color=['orange', 'blue'], alpha=0.7)
-    ax1.errorbar(['Fixa', 'Aprendida'],
+    ax1.errorbar(['Fixa Inteligente', 'Q-Learning'],
                  [np.mean(passos_fixa), np.mean(passos_aprendida)],
                  yerr=[np.std(passos_fixa), np.std(passos_aprendida)],
                  fmt='none', color='black', capsize=5)
     ax1.set_ylabel('Passos Médios')
-    ax1.set_title('Passos Médios por Episódio')
+    ax1.set_title('Passos Médios (Comparação)')
     ax1.grid(True, alpha=0.3, axis='y')
     
-    # 2. Recompensa média
     ax2 = axes[0, 1]
-    ax2.bar(['Fixa', 'Aprendida'],
-            [np.mean(recomp_fixa), np.mean(recomp_aprendida)],
-            color=['orange', 'blue'], alpha=0.7)
-    ax2.errorbar(['Fixa', 'Aprendida'],
-                 [np.mean(recomp_fixa), np.mean(recomp_aprendida)],
-                 yerr=[np.std(recomp_fixa), np.std(recomp_aprendida)],
-                 fmt='none', color='black', capsize=5)
-    ax2.set_ylabel('Recompensa Média')
-    ax2.set_title('Recompensa Média por Episódio')
-    ax2.grid(True, alpha=0.3, axis='y')
+    passos_fixa_media = calcular_media_movel(passos_fixa, janela=5)
+    passos_aprendida_media = calcular_media_movel(passos_aprendida, janela=5)
+    ax2.plot(ep_fixa, passos_fixa, alpha=0.3, color='orange', label='Fixa (valores)')
+    ax2.plot(ep_fixa, passos_fixa_media, color='orange', linewidth=2, label='Fixa Inteligente')
+    ax2.plot(ep_aprendida, passos_aprendida, alpha=0.3, color='blue', label='Q-Learning (valores)')
+    ax2.plot(ep_aprendida, passos_aprendida_media, color='blue', linewidth=2, label='Q-Learning')
+    ax2.set_xlabel('Episódio')
+    ax2.set_ylabel('Passos')
+    ax2.set_title('Evolução dos Passos')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
     
-    # 3. Taxa de sucesso
-    ax3 = axes[1, 0]
+    ax3 = axes[0, 2]
     taxa_fixa = np.mean(sucesso_fixa)
     taxa_aprendida = np.mean(sucesso_aprendida)
-    ax3.bar(['Fixa', 'Aprendida'],
+    ax3.bar(['Fixa Inteligente', 'Q-Learning'],
             [taxa_fixa, taxa_aprendida],
             color=['orange', 'blue'], alpha=0.7)
     ax3.set_ylabel('Taxa de Sucesso')
-    ax3.set_title('Taxa de Sucesso')
+    ax3.set_title('Taxa de Sucesso (Comparação)')
     ax3.set_ylim([0, 1.1])
     ax3.grid(True, alpha=0.3, axis='y')
     
-    # 4. Evolução da recompensa (média móvel)
-    ax4 = axes[1, 1]
+    ax4 = axes[1, 0]
+    ax4.bar(['Fixa Inteligente', 'Q-Learning'],
+            [np.mean(recomp_fixa), np.mean(recomp_aprendida)],
+            color=['orange', 'blue'], alpha=0.7)
+    ax4.errorbar(['Fixa Inteligente', 'Q-Learning'],
+                 [np.mean(recomp_fixa), np.mean(recomp_aprendida)],
+                 yerr=[np.std(recomp_fixa), np.std(recomp_aprendida)],
+                 fmt='none', color='black', capsize=5)
+    ax4.set_ylabel('Recompensa Média')
+    ax4.set_title('Recompensa Média (Comparação)')
+    ax4.grid(True, alpha=0.3, axis='y')
+    
+    ax5 = axes[1, 1]
     recomp_fixa_media = calcular_media_movel(recomp_fixa, janela=5)
     recomp_aprendida_media = calcular_media_movel(recomp_aprendida, janela=5)
-    ax4.plot(ep_fixa, recomp_fixa_media, label='Fixa', color='orange', linewidth=2)
-    ax4.plot(ep_aprendida, recomp_aprendida_media, label='Aprendida', color='blue', linewidth=2)
-    ax4.set_xlabel('Episódio')
-    ax4.set_ylabel('Recompensa (média móvel)')
-    ax4.set_title('Evolução da Recompensa')
-    ax4.legend()
-    ax4.grid(True, alpha=0.3)
+    ax5.plot(ep_fixa, recomp_fixa, alpha=0.3, color='orange', label='Fixa (valores)')
+    ax5.plot(ep_fixa, recomp_fixa_media, color='orange', linewidth=2, label='Fixa Inteligente')
+    ax5.plot(ep_aprendida, recomp_aprendida, alpha=0.3, color='blue', label='Q-Learning (valores)')
+    ax5.plot(ep_aprendida, recomp_aprendida_media, color='blue', linewidth=2, label='Q-Learning')
+    ax5.set_xlabel('Episódio')
+    ax5.set_ylabel('Recompensa Total')
+    ax5.set_title('Evolução da Recompensa')
+    ax5.legend()
+    ax5.grid(True, alpha=0.3)
+    
+    ax6 = axes[1, 2]
+    recomp_desc_fixa_media = calcular_media_movel(recomp_desc_fixa, janela=5)
+    recomp_desc_aprendida_media = calcular_media_movel(recomp_desc_aprendida, janela=5)
+    ax6.plot(ep_fixa, recomp_desc_fixa, alpha=0.3, color='orange', label='Fixa (valores)')
+    ax6.plot(ep_fixa, recomp_desc_fixa_media, color='orange', linewidth=2, label='Fixa Inteligente')
+    ax6.plot(ep_aprendida, recomp_desc_aprendida, alpha=0.3, color='blue', label='Q-Learning (valores)')
+    ax6.plot(ep_aprendida, recomp_desc_aprendida_media, color='blue', linewidth=2, label='Q-Learning')
+    ax6.set_xlabel('Episódio')
+    ax6.set_ylabel('Recompensa Descontada')
+    ax6.set_title('Evolução da Recompensa Descontada')
+    ax6.legend()
+    ax6.grid(True, alpha=0.3)
     
     plt.tight_layout()
     

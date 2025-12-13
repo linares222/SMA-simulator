@@ -38,18 +38,32 @@ class MotorDeSimulacao:
                 ag.politica.set_modo(self.modo)
 
     def _caminho_qtable(self, ag: Agente) -> str:
-        dir_ = self.diretorio_qtables or "qtables"
+        if self.diretorio_qtables:
+            dir_ = self.diretorio_qtables
+        else:
+            dir_ = str(Path(__file__).parent.parent / "qtables")
         return str(Path(dir_) / f"qtable_{ag.id}.json")
 
     def guardar_politicas(self):
+        from .politicas import PoliticaQLearning
+        guardadas = 0
         for ag in self.agentes:
-            if hasattr(ag.politica, 'guardar'):
+            if isinstance(ag.politica, PoliticaQLearning):
                 ag.politica.guardar(self._caminho_qtable(ag))
+                guardadas += 1
+        if guardadas > 0:
+            print(f"\nTotal: {guardadas} Q-table(s) guardada(s) de {len(self.agentes)} agente(s)")
 
     def carregar_politicas(self):
+        from .politicas import PoliticaFixaInteligente, PoliticaQLearning
+        
         for ag in self.agentes:
-            if hasattr(ag.politica, 'carregar'):
-                ag.politica.carregar(self._caminho_qtable(ag))
+            if isinstance(ag.politica, PoliticaQLearning):
+                sucesso = ag.politica.carregar(self._caminho_qtable(ag))
+                if not sucesso and self.modo == ModoExecucao.TESTE:
+                    tipo_agente = "FAROL" if "Farol" in ag.__class__.__name__ or "FAROL" in str(ag.id).upper() else "FORAGER"
+                    print(f"Aviso: Agente {ag.id} sem Q-table, usando politica fixa inteligente")
+                    ag.politica = PoliticaFixaInteligente(tipo_agente)
 
     def _reset_episodio(self):
         self.ambiente.terminou = False
@@ -100,6 +114,9 @@ class MotorDeSimulacao:
                     self.barreira_percepcao.wait()
                     self.barreira_acao.wait()
 
+                    if hasattr(self.ambiente, '_agentes'):
+                        self.ambiente._agentes = self.agentes
+                    
                     for ag in self.agentes:
                         accao = ag._accao_pronta
                         ag._accao_anterior = accao
@@ -111,6 +128,9 @@ class MotorDeSimulacao:
                         self.registador_resultados.registar_passo(recomp, val_dep)
 
                     self.ambiente.atualizacao()
+                    
+                    if hasattr(self.ambiente, 'verificar_termino'):
+                        self.ambiente.verificar_termino(self.agentes)
 
                     if self.visualizador:
                         self.visualizador.render(self.ambiente, self.agentes)
@@ -125,7 +145,7 @@ class MotorDeSimulacao:
                 if self.visualizador:
                     self.visualizador.render(self.ambiente, self.agentes)
 
-                print(f"Ep {ep+1}/{self.episodios}: passos={met.passos}, recomp={met.recompensa_total:.2f}, sucesso={met.sucesso}")
+                print(f"Ep {ep+1}/{self.episodios}: passos={met.passos}, recomp={met.recompensa_total:.2f}, sucesso={met.sucesso}", flush=True)
 
         finally:
             for a in self.agentes:

@@ -6,6 +6,19 @@ import json
 import copy
 from pathlib import Path
 from sma.loader import carregar_simulacao
+from sma.gerar_analise import gerar_comparacao
+
+
+def contar_qtables_disponiveis(ambiente: str) -> int:
+    """Conta quantas Q-tables existem para o ambiente especificado."""
+    base_path = Path(__file__).parent
+    qtables_dir = base_path / "qtables"
+    
+    if not qtables_dir.exists():
+        return 0
+    
+    prefixo = "AgenteFarol" if ambiente == "FAROL" else "Forager"
+    return sum(1 for _ in qtables_dir.glob(f"qtable_{prefixo}_*.json"))
 
 
 def executar_com_politica_fixa(cfg_path: str, num_episodios: int = 10):
@@ -54,15 +67,33 @@ def executar_com_politica_aprendida(cfg_path: str, num_episodios: int = 10):
     
     cfg_modificada = json.loads(json.dumps(cfg))
     
+    ambiente = cfg_modificada.get("ambiente", {}).get("tipo", "FAROL")
+    n_qtables = contar_qtables_disponiveis(ambiente)
+    
     if isinstance(cfg_modificada.get("agentes"), list):
-        for ag_cfg in cfg_modificada["agentes"]:
-            pol_original = ag_cfg.get("politica", {})
-            ag_cfg["politica"] = {
-                "tipo": "qlearning",
-                "alfa": pol_original.get("alfa", 0.2),
-                "gama": pol_original.get("gama", 0.95),
-                "epsilon": 0.0  # Sem exploração em teste
-            }
+        n_agentes = len(cfg_modificada["agentes"])
+        n_qlearning = min(n_agentes, n_qtables) if n_qtables > 0 else 0
+        
+        if n_qtables == 0:
+            print(f"\nAviso: Nao foram encontradas Q-tables para {ambiente}.")
+            print("   Todos os agentes usarao politica fixa inteligente.")
+        elif n_qtables < n_agentes:
+            print(f"\nAviso: {n_agentes} agentes mas apenas {n_qtables} Q-table(s).")
+            print(f"   Apenas {n_qlearning} agente(s) usarao Q-Learning.")
+        
+        for i, ag_cfg in enumerate(cfg_modificada["agentes"]):
+            if i < n_qlearning:
+                pol_original = ag_cfg.get("politica", {})
+                ag_cfg["politica"] = {
+                    "tipo": "qlearning",
+                    "alfa": pol_original.get("alfa", 0.2),
+                    "gama": pol_original.get("gama", 0.95),
+                    "epsilon": 0.0
+                }
+            else:
+                ag_cfg["politica"] = {
+                    "tipo": "fixa_inteligente"
+                }
     
     cfg_modificada["modo_execucao"] = "TESTE"
     cfg_modificada["episodios"] = num_episodios
@@ -136,17 +167,17 @@ def comparar_resultados(stats_fixa: dict, stats_aprendida: dict):
         pioras.append(f"Recompensa média diminuiu {abs(diff_recomp):.2f}")
     
     if melhoras:
-        print("✅ Melhorias com política aprendida:")
+        print("Melhorias com política aprendida:")
         for m in melhoras:
             print(f"   - {m}")
     
     if pioras:
-        print("❌ Piorias com política aprendida:")
+        print("Piorias com política aprendida:")
         for p in pioras:
             print(f"   - {p}")
     
     if not melhoras and not pioras:
-        print("➡️  Desempenho similar entre as duas políticas")
+        print("Desempenho similar entre as duas políticas")
     
     print()
 
@@ -194,14 +225,30 @@ def main():
     
     sim_temp = carregar_simulacao(str(cfg_path), visual=False, episodios=1)
     sim_temp.registador_resultados.historico = historico_fixa
-    sim_temp.registador_resultados.exportarCSV(str(base / "resultados_fixa.csv"))
+    csv_fixa = str(base / "resultados_fixa.csv")
+    sim_temp.registador_resultados.exportarCSV(csv_fixa)
     
     sim_temp.registador_resultados.historico = historico_aprendida
-    sim_temp.registador_resultados.exportarCSV(str(base / "resultados_aprendida.csv"))
+    csv_aprendida = str(base / "resultados_aprendida.csv")
+    sim_temp.registador_resultados.exportarCSV(csv_aprendida)
     
     print("\nResultados exportados:")
-    print(f"  - Política Fixa: {base / 'resultados_fixa.csv'}")
-    print(f"  - Política Aprendida: {base / 'resultados_aprendida.csv'}")
+    print(f"  - Política Fixa: {csv_fixa}")
+    print(f"  - Política Aprendida: {csv_aprendida}")
+    
+    try:
+        print("\n" + "="*70)
+        print("GERANDO GRÁFICOS COMPARATIVOS")
+        print("="*70)
+        gerar_comparacao(csv_fixa, csv_aprendida, base)
+        print(f"\nGráfico de comparação guardado em: {base / 'comparacao_politicas.png'}")
+    except ImportError:
+        print("\nAviso: matplotlib e numpy são necessários para gerar gráficos.")
+        print("   Instale com: pip install matplotlib numpy")
+        print("   Os CSVs foram gerados, mas os gráficos não puderam ser criados.")
+    except Exception as e:
+        print(f"\nAviso: Erro ao gerar gráficos: {e}")
+        print("   Os CSVs foram gerados, mas os gráficos não puderam ser criados.")
     
     return 0
 

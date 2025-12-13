@@ -34,6 +34,24 @@ def mostrar_banner():
     print(banner)
 
 
+def perguntar_modo_operacao() -> str:
+    """Pergunta se quer executar simulação normal ou comparar políticas."""
+    escolha = questionary.select(
+        "Escolhe o modo de operacao:",
+        choices=[
+            "Executar simulacao",
+            "Comparar politicas (Fixa Inteligente vs Q-Learning)"
+        ],
+        style=CLI_STYLE,
+    ).ask()
+    
+    if escolha is None:
+        print("\nOperacao cancelada.")
+        sys.exit(0)
+    
+    return escolha
+
+
 def perguntar_ambiente() -> str:
     """Pergunta qual ambiente simular."""
     escolha = questionary.select(
@@ -111,13 +129,46 @@ def perguntar_distribuicao_aprendizagem(total: int) -> int:
             return n_qlearning
 
 
-def perguntar_distribuicao_teste(total: int) -> int:
+def contar_qtables_disponiveis(ambiente: str) -> int:
+    """Conta quantas Q-tables existem para o ambiente especificado."""
+    base_path = Path(__file__).parent
+    qtables_dir = base_path / "qtables"
+    
+    if not qtables_dir.exists():
+        return 0
+    
+    prefixo = "AgenteFarol" if ambiente == "FAROL" else "Forager"
+    return sum(1 for _ in qtables_dir.glob(f"qtable_{prefixo}_*.json"))
+
+
+def perguntar_distribuicao_teste(total: int, ambiente: str) -> int:
     """Pergunta quantos agentes usam Q-table treinada (modo teste)."""
+    n_qtables = contar_qtables_disponiveis(ambiente)
+    max_agentes = min(total, n_qtables) if n_qtables > 0 else 0
+    
+    base_path = Path(__file__).parent
+    qtables_dir = base_path / "qtables"
+    total_qtables = sum(1 for _ in qtables_dir.glob("qtable_*.json")) if qtables_dir.exists() else 0
+    
+    if n_qtables == 0:
+        print(f"\nAviso: Nao foram encontradas Q-tables para o ambiente {ambiente}.")
+        if total_qtables > 0:
+            print(f"   (Existem {total_qtables} Q-table(s) no total, mas nenhuma para {ambiente})")
+        print("   Todos os agentes usarao politica fixa inteligente.")
+        return 0
+    
+    print(f"\nQ-tables disponiveis para {ambiente}: {n_qtables}")
+    if total_qtables > n_qtables:
+        print(f"   (Total de Q-tables no sistema: {total_qtables})")
+    if n_qtables < total:
+        print(f"Aviso: Tens {total} agentes mas apenas {n_qtables} Q-table(s).")
+        print(f"   O maximo de agentes com Q-Learning sera {max_agentes}.")
+    
     while True:
         resposta = questionary.text(
-            f"Quantos usam Q-table treinada? [0-{total}]",
-            default=str(total),
-            validate=lambda x: x.isdigit() and 0 <= int(x) <= total or f"Introduz um numero entre 0 e {total}",
+            f"Quantos usam Q-table treinada? [0-{max_agentes}]",
+            default=str(max_agentes),
+            validate=lambda x: x.isdigit() and 0 <= int(x) <= max_agentes or f"Introduz um numero entre 0 e {max_agentes}",
             style=CLI_STYLE,
         ).ask()
         
@@ -505,18 +556,144 @@ def gerar_graficos_selecionados(csv_path: str, graficos: List[str], config: Dict
         print(f"\nAviso: Erro ao gerar graficos: {e}")
 
 
+def executar_comparacao_politicas():
+    """Executa comparação entre política fixa e aprendida."""
+    from sma.comparar_politicas import (
+        executar_com_politica_fixa,
+        executar_com_politica_aprendida,
+        comparar_resultados
+    )
+    from sma.loader import carregar_simulacao
+    
+    mostrar_banner()
+    print("\n" + "="*70)
+    print("COMPARACAO DE POLITICAS")
+    print("="*70)
+    print("\nEste modo compara a politica fixa inteligente com Q-Learning.")
+    print("NOTA: A Q-table deve ter sido treinada previamente em modo APRENDIZAGEM\n")
+    
+    ambiente = perguntar_ambiente()
+    n_qtables = contar_qtables_disponiveis(ambiente)
+    
+    if n_qtables == 0:
+        print(f"\nErro: Nao foram encontradas Q-tables para o ambiente {ambiente}.")
+        print("   Treina primeiro os agentes em modo APRENDIZAGEM.")
+        return
+    
+    print(f"\nQ-tables disponiveis para {ambiente}: {n_qtables}")
+    n_agentes = perguntar_num_agentes()
+    
+    if n_agentes > n_qtables:
+        print(f"\nAviso: Tens {n_agentes} agentes mas apenas {n_qtables} Q-table(s).")
+        print(f"   Limitando a {n_qtables} agentes para comparacao.")
+        n_agentes = n_qtables
+    
+    episodios = perguntar_episodios()
+    max_passos = perguntar_max_passos()
+    
+    config = gerar_config_dinamico(
+        ambiente=ambiente,
+        modo="TESTE",
+        n_agentes=n_agentes,
+        n_aprendizagem=n_agentes,
+        episodios=episodios,
+        max_passos=max_passos,
+    )
+    
+    base_path = Path(__file__).parent
+    config_path = base_path / "temp_comparacao.json"
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2)
+    
+    try:
+        stats_fixa, historico_fixa = executar_com_politica_fixa(
+            str(config_path),
+            episodios
+        )
+        
+        stats_aprendida, historico_aprendida = executar_com_politica_aprendida(
+            str(config_path),
+            episodios
+        )
+        
+        comparar_resultados(stats_fixa, stats_aprendida)
+        
+        resultados_dir = base_path / "resultados"
+        resultados_dir.mkdir(exist_ok=True)
+        
+        sim_temp = carregar_simulacao(str(config_path), visual=False, episodios=1)
+        sim_temp.registador_resultados.historico = historico_fixa
+        csv_fixa = str(resultados_dir / "comparacao_fixa.csv")
+        sim_temp.registador_resultados.exportarCSV(csv_fixa)
+        
+        sim_temp.registador_resultados.historico = historico_aprendida
+        csv_aprendida = str(resultados_dir / "comparacao_aprendida.csv")
+        sim_temp.registador_resultados.exportarCSV(csv_aprendida)
+        
+        print("\nResultados exportados:")
+        print(f"  - Política Fixa: {csv_fixa}")
+        print(f"  - Política Aprendida: {csv_aprendida}")
+        
+        try:
+            from sma.gerar_analise import gerar_comparacao
+            import subprocess
+            import platform
+            
+            print("\n" + "="*70)
+            print("GERANDO GRAFICOS COMPARATIVOS")
+            print("="*70)
+            gerar_comparacao(csv_fixa, csv_aprendida, resultados_dir)
+            print(f"\nGrafico de comparacao guardado em: {resultados_dir / 'comparacao_politicas.png'}")
+            
+            grafico_path = resultados_dir / "comparacao_politicas.png"
+            try:
+                if platform.system() == 'Darwin':
+                    subprocess.run(['open', str(grafico_path)], check=True)
+                elif platform.system() == 'Windows':
+                    subprocess.run(['start', '', str(grafico_path)], shell=True, check=True)
+                else:
+                    subprocess.run(['xdg-open', str(grafico_path)], check=True)
+                print("Grafico aberto no visualizador de imagens.")
+            except Exception:
+                print("Abre o ficheiro manualmente para ver os graficos.")
+        except ImportError:
+            print("\nAviso: matplotlib e numpy sao necessarios para gerar graficos.")
+            print("   Instale com: pip install matplotlib numpy")
+            print("   Os CSVs foram gerados, mas os graficos nao puderam ser criados.")
+        except Exception as e:
+            print(f"\nAviso: Erro ao gerar graficos: {e}")
+            print("   Os CSVs foram gerados, mas os graficos nao puderam ser criados.")
+        
+    finally:
+        if config_path.exists():
+            config_path.unlink()
+
+
 def main():
     """Função principal do CLI."""
     mostrar_banner()
     
+    modo_operacao = perguntar_modo_operacao()
+    
+    if modo_operacao == "Comparar politicas (Fixa Inteligente vs Q-Learning)":
+        executar_comparacao_politicas()
+        return
+    
     ambiente = perguntar_ambiente()
     modo = perguntar_modo()
+    
+    if modo == "TESTE":
+        n_qtables = contar_qtables_disponiveis(ambiente)
+        if n_qtables > 0:
+            print(f"\nQ-tables disponiveis para {ambiente}: {n_qtables}")
+    
     n_agentes = perguntar_num_agentes()
     
     if modo == "APRENDIZAGEM":
         n_aprendizagem = perguntar_distribuicao_aprendizagem(n_agentes)
     else:
-        n_aprendizagem = perguntar_distribuicao_teste(n_agentes)
+        n_aprendizagem = perguntar_distribuicao_teste(n_agentes, ambiente)
     
     episodios = perguntar_episodios()
     max_passos = perguntar_max_passos()
