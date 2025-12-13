@@ -1,0 +1,40 @@
+{
+    "modo_execucao": "TESTE",
+    "episodios": 5,
+    "max_passos": 50,
+    "visualizar": false,
+    "ambiente": {
+      "tipo": "FORAGING",
+      "largura": 10,
+      "altura": 8,
+      "ninho": [5, 4],
+      "recursos": [
+        { "x": 2, "y": 2, "valor": 5 }, 
+        { "x": 7, "y": 6, "valor": 10 },
+        { "x": 1, "y": 5, "valor": 3 }
+      ]
+    },
+    "agentes": [
+      {
+        "tipo": "FORAGER",
+        "id": "ForagerQL_0",
+        "posicao_inicial": [0, 0],
+        "politica": {
+          "tipo": "qlearning",
+          "alfa": 0.2,
+          "gama": 0.95,
+          "epsilon": 0.0
+        }
+      },
+      {
+        "tipo": "FORAGER",
+        "id": "ForagerFixo_1",
+        "posicao_inicial": [9, 7],
+        "politica": {
+          "tipo": "fixa",
+          "acao_default": "MoverN"
+        }
+      }
+    ]
+  }
+

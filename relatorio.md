@@ -1,0 +1,1164 @@
+# Relatório Técnico: Simulador de Sistemas Multi-Agente
+
+## Índice
+1. [Arquitetura do Simulador](#arquitetura-do-simulador)
+2. [Interface Interativa (CLI)](#interface-interativa-cli)
+3. [Sensores](#sensores)
+4. [Agentes](#agentes)
+5. [Ambientes](#ambientes)
+6. [Políticas](#políticas)
+7. [Modos de Operação](#modos-de-operação)
+8. [Sincronização e Threads](#sincronização-e-threads)
+9. [Métricas de Desempenho](#métricas-de-desempenho)
+
+---
+
+## Arquitetura do Simulador
+
+O simulador segue uma arquitetura modular baseada em três componentes principais:
+
+### 1. Motor de Simulação (`MotorDeSimulacao`)
+
+O motor de simulação gere o ciclo de tempo e a ordem de execução das ações dos agentes.
+
+**Interface principal:**
+- `cria(nome_do_ficheiro_parametros: string) -> MotorDeSimulacao`: Cria uma instância do simulador a partir de um ficheiro JSON de configuração
+- `listaAgentes() -> Agente[]`: Retorna a lista de agentes no simulador
+- `executa()`: Executa a simulação completa
+
+**Funcionalidades:**
+- Gestão de episódios e passos de simulação
+- Sincronização de agentes através de barreiras (threading.Barrier)
+- Registo de resultados e métricas
+- Suporte para visualização
+- Gestão de políticas (guardar/carregar Q-tables)
+
+### 2. Ambiente Base (`Ambiente`)
+
+Interface abstrata que define o contrato para todos os ambientes.
+
+**Métodos obrigatórios:**
+- `observacaoPara(agente: Agente) -> Observacao`: Retorna a observação do ambiente para um agente (método legado, os sensores usam métodos específicos)
+- `agir(accao: Accao, agente: Agente) -> float`: Executa uma ação do agente e retorna a recompensa
+- `atualizacao()`: Chamado no fim de cada passo de simulação
+
+### 3. Agente Base (`Agente`)
+
+Classe abstrata que implementa a interface de agente como uma thread independente.
+
+**Métodos principais:**
+- `cria(cfg: str) -> Agente`: Método estático para criar agentes a partir de configuração
+- `observacao(obs: Observacao)`: Recebe uma observação do ambiente
+- `age() -> Accao`: Método abstrato que retorna a ação a executar
+- `avaliacaoEstadoAtual(recompensa: float)`: Recebe a recompensa e atualiza a política
+- `instala(sensor: Sensor)`: Instala um sensor no agente
+- `comunica(mensagem: String, de_agente: Agente)`: Permite comunicação entre agentes
+
+---
+
+## Interface Interativa (CLI)
+
+### Visão Geral
+
+Foi implementada uma interface de linha de comando (CLI) interativa que simplifica significativamente a configuração e execução de simulações. O CLI utiliza a biblioteca `questionary` para fornecer uma experiência de utilizador intuitiva e guiada.
+
+### Execução
+
+```bash
+./run.sh
+```
+
+O script `run.sh`:
+- Detecta e ativa automaticamente o ambiente virtual Python (`.env-aa`, `venv`, `.venv`, etc.)
+- Instala dependências automaticamente se necessário
+- Executa o CLI interativo
+
+### Fluxo de Configuração
+
+O CLI guia o utilizador através de uma série de perguntas:
+
+1. **Escolha do Ambiente:**
+   - FAROL: Navegação até ao farol
+   - FORAGING: Recolha e depósito de recursos
+
+2. **Modo de Execução:**
+   - APRENDIZAGEM: Treinar agentes com Q-Learning
+   - TESTE: Avaliar políticas pré-treinadas
+
+3. **Número de Agentes:**
+   - Quantidade total de agentes na simulação
+
+4. **Distribuição de Políticas:**
+   - **Modo APRENDIZAGEM:** Quantos agentes usam Q-Learning vs política fixa
+   - **Modo TESTE:** Quantos agentes usam Q-table treinada vs política fixa
+
+5. **Episódios:**
+   - Número de episódios a executar (padrão: 100)
+
+6. **Máximo de Passos:**
+   - Número máximo de passos por episódio (padrão: 200)
+   - Controla quando um episódio termina por timeout
+
+7. **Gráficos:**
+   - Seleção de quais gráficos gerar no final:
+     - Curva de Aprendizagem (Recompensa)
+     - Passos por Episódio
+     - Recompensa Descontada
+     - Taxa de Sucesso Acumulada
+
+### Funcionalidades Implementadas
+
+#### Geração Dinâmica de Configuração
+
+O CLI gera automaticamente um ficheiro JSON de configuração temporário baseado nas escolhas do utilizador:
+
+```python
+def gerar_config_dinamico(
+    ambiente: str,
+    modo: str,
+    n_agentes: int,
+    n_aprendizagem: int,
+    episodios: int,
+    max_passos: int,
+) -> Dict[str, Any]
+```
+
+**Características:**
+- Carrega template base do ambiente (`config_farol.json` ou `config_foraging.json`)
+- Atualiza parâmetros com escolhas do utilizador
+- Gera distribuição de agentes (Q-Learning vs política fixa)
+- Posiciona agentes estrategicamente (cantos, bordas, ou aleatório)
+
+#### Execução em Duas Fases
+
+1. **Simulação Principal:**
+   - Executa todos os episódios sem visualização (mais rápido)
+   - Regista resultados em CSV
+   - Guarda Q-tables (modo APRENDIZAGEM)
+
+2. **Episódio Final com Visualização:**
+   - Executa um único episódio com visualização ativada
+   - Carrega Q-tables treinadas (se modo TESTE)
+   - Desativa exploração (epsilon = 0) para demonstração
+
+#### Geração Automática de Gráficos
+
+Se o utilizador selecionar gráficos:
+
+1. **Carrega dados do CSV** gerado durante a simulação
+2. **Gera gráficos** usando Matplotlib:
+   - Curva de Aprendizagem (com média móvel)
+   - Passos por Episódio (com média móvel)
+   - Recompensa Descontada (com média móvel)
+   - Taxa de Sucesso Acumulada
+3. **Guarda em PNG** no diretório `sma/analise/`
+4. **Abre automaticamente** o ficheiro no visualizador de imagens do sistema
+
+**Formato do ficheiro:** `{ambiente}_{modo}_graficos.png`
+
+#### Tratamento de Erros
+
+- **Cancelamento:** `Ctrl+C` cancela graciosamente a operação
+- **Validação:** Todas as entradas são validadas (números positivos, limites, etc.)
+- **Erros de Importação:** Avisos amigáveis se Matplotlib não estiver disponível
+
+### Exemplo de Uso
+
+```
+==================================================
+   SIMULADOR MULTI-AGENTE - CLI INTERATIVO
+==================================================
+
+? Escolhe o ambiente a simular: FAROL
+? Escolhe o modo de execucao: TESTE
+? Quantos agentes no total? 2
+? Quantos usam Q-table treinada? [0-2] 1
+? Confirmas? 1 Q-table + 1 politica fixa = 2 total Yes
+? Quantos episodios? 100
+? Maximo de passos por episodio? 50
+? Mostrar graficos no final? Yes
+? Seleciona os graficos: [✓] Curva de Aprendizagem
+                         [✓] Passos por Episodio
+                         [✓] Recompensa Descontada
+                         [✓] Taxa de Sucesso
+
+==================================================
+   INICIANDO SIMULACAO
+==================================================
+
+Configuracao:
+   Ambiente: FAROL
+   Modo: TESTE
+   Agentes: 2
+   Episodios: 100
+   Max passos: 50
+
+[... execucao da simulacao ...]
+
+Resultados guardados em: sma/resultados/farol_teste_cli.csv
+
+--------------------------------------------------
+   EPISODIO FINAL (com visualizacao)
+--------------------------------------------------
+
+[... episodio final com janela grafica ...]
+
+Graficos guardados em: sma/analise/farol_teste_graficos.png
+Ficheiro aberto no visualizador de imagens.
+```
+
+### Vantagens do CLI
+
+1. **Facilidade de Uso:** Não requer conhecimento de JSON ou parâmetros de linha de comando
+2. **Validação Automática:** Previne erros de configuração
+3. **Feedback Visual:** Mostra progresso e resultados claramente
+4. **Flexibilidade:** Permite configurar todos os aspectos da simulação
+5. **Automação:** Gera gráficos e abre ficheiros automaticamente
+6. **Reprodutibilidade:** Configurações podem ser facilmente repetidas
+
+### Integração com Sistema Existente
+
+O CLI utiliza a mesma infraestrutura do simulador:
+- Usa `carregar_simulacao()` do `loader.py`
+- Compatível com todos os ambientes e agentes existentes
+- Reutiliza sistema de registo de resultados
+- Integra com sistema de análise de gráficos
+
+---
+
+## Sensores
+
+### Arquitetura de Sensores
+
+Os sensores implementam o padrão de design **Strategy**, permitindo que diferentes tipos de percepção sejam instalados nos agentes de forma flexível.
+
+### Classe Base: `Sensor`
+
+```python
+class Sensor:
+    def ler(self, ambiente: Any, agente: Any) -> Any:
+        raise NotImplementedError
+```
+
+Todos os sensores devem implementar o método `ler()` que recebe o ambiente e o agente, e retorna os dados sensoriais.
+
+### Fluxo de Percepção
+
+1. **Simulador chama** `agente.observar(ambiente)`
+2. **Agente itera** pelos sensores instalados e chama `sensor.ler(ambiente, agente)`
+3. **Sensor acessa** métodos específicos do ambiente para obter informações
+4. **Observação é retornada** e armazenada no agente
+
+### Implementação no Agente
+
+O método `observar()` do agente processa os sensores:
+
+```python
+def observar(self, ambiente) -> Observacao:
+    if not self.sensores:
+        return Observacao(dados=None)
+    
+    if len(self.sensores) == 1:
+        dados = self.sensores[0].ler(ambiente, self)
+        return Observacao(dados=dados)
+    
+    # Múltiplos sensores: combina em dicionário
+    dados = {}
+    for i, sensor in enumerate(self.sensores):
+        nome = sensor.__class__.__name__
+        dados[f"{nome}_{i}"] = sensor.ler(ambiente, self)
+    return Observacao(dados=dados)
+```
+
+### Sensores Implementados
+
+#### 1. `SensorDirecaoFarol`
+
+**Uso:** Ambiente Farol
+
+**Funcionalidade:**
+- Retorna a direção do farol (global)
+- Retorna informações da vizinhança (local) - 8 direções (cardeais + diagonais)
+- Indica se o agente está no farol
+
+**Dados retornados:**
+```python
+{
+    "dir_farol": (dx, dy),      # Direção do farol: valores em {-1, 0, 1}
+    "viz": {                     # Vizinhança (8 direções)
+        (0, -1): valor,          # Norte
+        (0, 1): valor,            # Sul
+        (1, 0): valor,             # Este
+        (-1, 0): valor,            # Oeste
+        (1, 1): valor,             # Nordeste
+        (1, -1): valor,            # Sudeste
+        (-1, 1): valor,             # Noroeste
+        (-1, -1): valor,           # Sudoeste
+    },
+    "no_farol": bool             # True se está no farol
+}
+```
+
+**Valores na vizinhança:**
+- `0`: Célula vazia
+- `1`: Farol
+- `2`: Obstáculo
+- `-1`: Fora dos limites do ambiente
+
+**Configuração:**
+- `diagonais: bool = True`: Inclui ou não as direções diagonais
+
+#### 2. `SensorVizinhancaGrid`
+
+**Uso:** Ambiente Foraging
+
+**Funcionalidade:**
+- Retorna informações da vizinhança (local) - 8 direções (cardeais + diagonais)
+- Retorna informações globais (direção do ninho, recursos, etc.)
+
+**Dados retornados:**
+```python
+{
+    "viz": {                     # Vizinhança (8 direções)
+        (0, -1): valor,          # Norte
+        (0, 1): valor,            # Sul
+        (1, 0): valor,            # Este
+        (-1, 0): valor,           # Oeste
+        (1, 1): valor,            # Nordeste
+        (1, -1): valor,           # Sudeste
+        (-1, 1): valor,           # Noroeste
+        (-1, -1): valor,          # Sudoeste
+    },
+    "carregando": int,           # Quantidade de recurso carregando
+    "dir_ninho": (dx, dy),       # Direção para o ninho
+    "dist_ninho": int,            # Distância Manhattan até o ninho (max 10)
+    "dir_recurso": (dx, dy),      # Direção para o recurso mais próximo
+    "no_ninho": bool,             # True se está no ninho
+    "no_recurso": bool            # True se está em um recurso
+}
+```
+
+**Valores na vizinhança:**
+- `0`: Célula vazia
+- `2`: Recurso
+- `3`: Ninho
+- `9`: Obstáculo
+- `-1`: Fora dos limites do ambiente
+
+**Configuração:**
+- `raio: int = 1`: Raio de percepção (atualmente sempre 1)
+- `diagonais: bool = True`: Inclui ou não as direções diagonais
+
+### Modelação da Percepção
+
+**Farol:**
+- **Percepção híbrida:** Local (vizinhança) + Global (direção do farol)
+- O agente vê o que está ao redor (obstáculos, limites) e sabe a direção geral do farol
+- Permite navegação local evitando obstáculos e navegação global em direção ao objetivo
+
+**Foraging:**
+- **Percepção híbrida:** Local (vizinhança) + Global (direções do ninho e recursos)
+- O agente vê o que está ao redor (recursos, ninho, obstáculos) e tem informações globais sobre objetivos
+- Permite decisões locais (coletar recurso próximo) e globais (ir para o ninho)
+
+---
+
+## Agentes
+
+### Interface do Agente
+
+A classe `Agente` implementa a interface especificada no enunciado:
+
+```python
+class Agente(threading.Thread, ABC):
+    @staticmethod
+    def cria(cfg: str) -> "Agente"
+    def observacao(obs: Observacao)
+    def age() -> Accao
+    def avaliacaoEstadoAtual(recompensa: float)
+    def instala(sensor: Sensor)
+    def comunica(mensagem: String, de_agente: Agente)
+```
+
+### Implementação como Thread
+
+Os agentes são implementados como threads independentes (`threading.Thread`), permitindo execução paralela. A sincronização é feita através de barreiras:
+
+- **Barreira de Percepção:** Todos os agentes recebem observações antes de decidir ações
+- **Barreira de Ação:** Todas as ações são decididas antes de serem executadas
+
+### Agentes Implementados
+
+#### 1. `AgenteFarol`
+
+**Sensor instalado:** `SensorDirecaoFarol`
+
+**Ações disponíveis:**
+- `MoverN`, `MoverS`, `MoverE`, `MoverO`: Movimento nas 4 direções cardeais
+- `Stay`: Permanecer no mesmo lugar
+
+**Políticas suportadas:**
+- `PoliticaFixa`: Sempre executa a mesma ação
+- `PoliticaQLearning`: Aprendizagem por reforço
+
+#### 2. `AgenteForager`
+
+**Sensor instalado:** `SensorVizinhancaGrid`
+
+**Ações disponíveis:**
+- `MoverN`, `MoverS`, `MoverE`, `MoverO`: Movimento nas 4 direções cardeais
+- `Stay`: Permanecer no mesmo lugar
+- `Coletar`: Coletar recurso na posição atual
+- `Depositar`: Depositar recurso no ninho
+
+**Estado adicional:**
+- `carregando: int`: Quantidade de recurso que está carregando
+
+**Políticas suportadas:**
+- `PoliticaFixa`: Sempre executa a mesma ação
+- `PoliticaQLearning`: Aprendizagem por reforço
+
+---
+
+## Ambientes
+
+### Ambiente Farol (`AmbienteFarol`)
+
+**Características:**
+- Espaço 2D (grelha)
+- Um farol em posição fixa
+- Suporte para obstáculos
+- Objetivo: Agente deve chegar ao farol
+
+**Métodos específicos:**
+- `direcao_para_farol(pos_ag) -> Tuple[int, int]`: Retorna direção do farol
+- `vizinhanca(pos, raio, diagonais, agente) -> dict`: Retorna informações da vizinhança
+
+**Recompensas:**
+- `99.0`: Chegou ao farol
+- `-1.0`: Movimento normal
+- `-10.0`: Tentou mover para fora dos limites ou para obstáculo
+
+### Ambiente Foraging (`AmbienteForaging`)
+
+**Características:**
+- Espaço 2D (grelha)
+- Recursos com valores diferentes
+- Ninho/ponto de entrega
+- Suporte para obstáculos
+- Objetivo: Maximizar recursos coletados e depositados no ninho
+
+**Métodos específicos:**
+- `vizinhanca(pos, raio, diagonais, agente) -> dict`: Retorna informações completas da vizinhança e objetivos
+
+**Recompensas:**
+- `+5.0`: Coletou recurso
+- `+valor * 2.0`: Depositou recurso no ninho
+- `+0.5`: Movendo-se em direção ao ninho (carregando recurso)
+- `+0.3`: Movendo-se em direção a recurso (sem carga)
+- `-0.1`: Movimento normal
+- `-2.0`: Tentou coletar/depositar em condições inválidas
+- `-5.0`: Tentou mover para fora dos limites ou para obstáculo
+
+**Condição de término:**
+- Todos os recursos foram coletados E todos os agentes depositaram suas cargas
+
+---
+
+## Políticas
+
+### Classe Base: `Politica`
+
+Interface abstrata que define o contrato para políticas de decisão:
+
+```python
+class Politica:
+    def selecionar_acao(self, estado: Observacao) -> Accao
+    def atualizar(self, estado, accao, recompensa, prox_estado)
+    def set_modo(self, modo: str)
+    def guardar(self, caminho: str)
+    def carregar(self, caminho: str) -> bool
+```
+
+### Políticas Implementadas
+
+#### 1. `PoliticaFixa`
+
+Política pré-programada que sempre retorna a mesma ação.
+
+**Uso:** Agentes de referência, testes básicos
+
+#### 2. `PoliticaFixaInteligente`
+
+Política fixa que usa heurísticas baseadas nas observações dos sensores. Mais inteligente que `PoliticaFixa` e útil para comparação com políticas aprendidas.
+
+**Heurísticas para Farol:**
+- Move na direção do farol (usando `dir_farol` da observação)
+- Evita obstáculos (verifica `viz` antes de mover)
+- Prioriza movimento horizontal (Este/Oeste) antes de vertical (Norte/Sul)
+- Se bloqueado, tenta contornar obstáculos
+
+**Heurísticas para Foraging:**
+- Se está no ninho e carregando: deposita
+- Se está num recurso e não está carregando: coleta
+- Se está carregando: move na direção do ninho
+- Se não está carregando: move na direção do recurso mais próximo
+- Evita obstáculos
+- Se há recurso na vizinhança, tenta ir para ele
+
+**Uso:** Comparação com políticas aprendidas, baseline inteligente
+
+**Configuração:**
+```json
+{
+  "politica": {
+    "tipo": "fixa_inteligente"
+  }
+}
+```
+
+#### 3. `PoliticaQLearning`
+
+Implementação do algoritmo Q-Learning para aprendizagem por reforço.
+
+**Parâmetros:**
+- `alfa` (taxa de aprendizagem): 0.0 a 1.0 (padrão: 0.2)
+- `gama` (fator de desconto): 0.0 a 1.0 (padrão: 0.95)
+- `epsilon` (exploração): 0.0 a 1.0 (padrão: 0.1)
+
+**Funcionamento:**
+1. **Seleção de ação:**
+   - Modo APRENDIZAGEM: ε-greedy (explora com probabilidade ε)
+   - Modo TESTE: Sempre escolhe a melhor ação (ε=0)
+
+2. **Atualização Q-value:**
+   ```
+   Q(s,a) = Q(s,a) + α * [r + γ * max(Q(s',a')) - Q(s,a)]
+   ```
+
+3. **Persistência:**
+   - Q-tables são guardadas em ficheiros JSON após aprendizagem
+   - Q-tables são carregadas automaticamente em modo TESTE
+
+**Representação de estados:**
+- Estados são representados como strings usando `repr(obs.dados)`
+- Permite usar qualquer estrutura de dados como estado (tuplas, dicionários, etc.)
+
+### Funcionamento do Q-Learning no Projeto
+
+#### Representação de Estados
+
+O Q-Learning usa `repr(obs.dados)` para criar uma chave única que identifica cada estado. Esta chave é usada para indexar a Q-table.
+
+**Exemplo - Farol:**
+```python
+# Observação do sensor
+obs.dados = {
+    "dir_farol": (1, 1),
+    "viz": {(0, -1): -1, (0, 1): 0, (1, 0): 0, (-1, 0): -1, ...},
+    "no_farol": False
+}
+
+# Chave na Q-table
+chave = repr(obs.dados)
+# Resultado: "{'dir_farol': (1, 1), 'viz': {...}, 'no_farol': False}"
+```
+
+**Exemplo - Foraging:**
+```python
+# Observação do sensor
+obs.dados = {
+    "viz": {(0, -1): -1, (0, 1): 0, (1, 0): 2, ...},
+    "carregando": 0,
+    "dir_ninho": (1, 1),
+    "dist_ninho": 5,
+    "dir_recurso": (1, 0),
+    "no_ninho": False,
+    "no_recurso": False
+}
+
+# Chave na Q-table
+chave = repr(obs.dados)
+```
+
+#### Ciclo de Aprendizagem
+
+**1. Inicialização:**
+- Q-table começa vazia: `Q = {}`
+- Quando um estado novo é encontrado, todas as ações são inicializadas com Q-value = 0.0
+
+**2. Seleção de Ação (ε-greedy):**
+```python
+# Modo APRENDIZAGEM
+if random.random() < epsilon:
+    acao = random.choice(acoes)  # Exploração
+else:
+    acao = max(Q[estado], key=Q[estado].get)  # Exploração (melhor ação conhecida)
+
+# Modo TESTE
+acao = max(Q[estado], key=Q[estado].get)  # Sempre melhor ação
+```
+
+**3. Execução e Recompensa:**
+- Ação é executada no ambiente
+- Ambiente retorna recompensa `r`
+- Ambiente transita para novo estado `s'`
+
+**4. Atualização Q-value:**
+```python
+Q[s][a] = Q[s][a] + α * (r + γ * max(Q[s']) - Q[s][a])
+```
+
+Onde:
+- `Q[s][a]`: Q-value atual do estado `s` e ação `a`
+- `r`: Recompensa recebida
+- `γ * max(Q[s'])`: Melhor Q-value do próximo estado (descontado)
+- `α`: Taxa de aprendizagem (controla velocidade de atualização)
+
+#### Exemplo Prático - Farol
+
+**Estado inicial:**
+```python
+estado = {
+    "dir_farol": (1, 1),  # Farol a sudeste
+    "viz": {(1, 0): 0, (0, 1): 0, ...},  # Células livres
+    "no_farol": False
+}
+```
+
+**Ações disponíveis:** `MoverN`, `MoverS`, `MoverE`, `MoverO`, `Stay`
+
+**Ciclo de aprendizagem:**
+
+1. **Primeira vez neste estado:**
+   - Q-table inicializa: `Q[estado] = {MoverN: 0.0, MoverS: 0.0, MoverE: 0.0, MoverO: 0.0, Stay: 0.0}`
+   - Escolhe ação aleatória (exploração): `MoverE`
+
+2. **Execução:**
+   - Move para Este
+   - Recompensa: `-1.0` (movimento normal)
+   - Novo estado: mais próximo do farol
+
+3. **Atualização:**
+   ```python
+   # Supondo α=0.2, γ=0.95
+   Q[estado][MoverE] = 0.0 + 0.2 * (-1.0 + 0.95 * max(Q[novo_estado]) - 0.0)
+   # Se max(Q[novo_estado]) = 0.0 (estado novo)
+   Q[estado][MoverE] = 0.0 + 0.2 * (-1.0 + 0.0) = -0.2
+   ```
+
+4. **Após várias iterações:**
+   - Se `MoverE` leva consistentemente mais perto do farol, Q-value aumenta
+   - Se `MoverO` leva para longe, Q-value diminui
+   - Q-table aprende qual ação é melhor em cada estado
+
+**Q-table treinada (exemplo):**
+```json
+{
+  "{'dir_farol': (1, 1), ...}": {
+    "MoverN": -18.84,  // Pior (move para longe)
+    "MoverS": -9.98,   // Melhor
+    "MoverE": -9.97,   // Melhor
+    "MoverO": -18.56,  // Pior
+    "Stay": -9.98
+  }
+}
+```
+
+#### Exemplo Prático - Foraging
+
+**Estado: Agente sem carga, recurso próximo**
+```python
+estado = {
+    "viz": {(1, 0): 2, ...},  # Recurso a Este
+    "carregando": 0,
+    "dir_recurso": (1, 0),
+    "no_recurso": False,
+    ...
+}
+```
+
+**Ações disponíveis:** `MoverN`, `MoverS`, `MoverE`, `MoverO`, `Stay`, `Coletar`, `Depositar`
+
+**Ciclo de aprendizagem:**
+
+1. **Estado inicial:**
+   - Q-table inicializa todas as ações com 0.0
+   - Escolhe ação: `MoverE` (exploração)
+
+2. **Execução:**
+   - Move para Este (em direção ao recurso)
+   - Recompensa: `-0.1` (movimento) + `0.3` (aproximando-se do recurso) = `+0.2`
+   - Novo estado: mais próximo do recurso
+
+3. **Quando chega ao recurso:**
+   - Estado: `{"no_recurso": True, "carregando": 0, ...}`
+   - Ação: `Coletar`
+   - Recompensa: `+5.0` (coletou recurso)
+   - Novo estado: `{"carregando": 5, ...}`
+
+4. **Com recurso coletado:**
+   - Estado: `{"carregando": 5, "dir_ninho": (-1, -1), ...}`
+   - Ação: `MoverO` (em direção ao ninho)
+   - Recompensa: `-0.1` + `0.5` (aproximando-se do ninho) = `+0.4`
+
+5. **Quando chega ao ninho:**
+   - Estado: `{"no_ninho": True, "carregando": 5, ...}`
+   - Ação: `Depositar`
+   - Recompensa: `+5.0 * 2.0 = +10.0` (depositou recurso)
+
+**Aprendizagem:**
+- Q-Learning aprende que `Coletar` quando `no_recurso=True` e `carregando=0` é bom (+5.0)
+- Aprende que `Depositar` quando `no_ninho=True` e `carregando>0` é muito bom (+10.0)
+- Aprende que mover em direção ao recurso quando `carregando=0` é bom
+- Aprende que mover em direção ao ninho quando `carregando>0` é bom
+
+#### Estrutura da Q-table
+
+A Q-table é um dicionário de dicionários:
+
+```python
+Q = {
+    "chave_estado_1": {
+        TipoAccao.MoverN: -5.2,
+        TipoAccao.MoverS: 3.1,
+        TipoAccao.MoverE: 4.5,  # Melhor ação
+        ...
+    },
+    "chave_estado_2": {
+        ...
+    },
+    ...
+}
+```
+
+**Guardar Q-table:**
+- Guardada em JSON após cada episódio em modo APRENDIZAGEM
+- Formato: `qtable_{agente_id}.json`
+- Inclui: Q-values, ações, parâmetros (alfa, gama, epsilon)
+
+**Carregar Q-table:**
+- Carregada automaticamente em modo TESTE
+- Permite usar política treinada sem re-treinar
+
+#### Vantagens e Limitações
+
+**Vantagens:**
+- ✅ Aprende estratégias ótimas através de tentativa e erro
+- ✅ Não precisa de modelo do ambiente
+- ✅ Funciona com qualquer estrutura de observação
+- ✅ Persistência (pode guardar e carregar conhecimento)
+
+**Limitações:**
+- ⚠️ Espaço de estados pode ser muito grande (cada combinação única de observação = novo estado)
+- ⚠️ Pode precisar de muitos episódios para convergir
+- ⚠️ Exploração vs Exploração: muito epsilon = lento, pouco epsilon = pode ficar preso em sub-ótimo
+
+---
+
+## Modos de Operação
+
+### Modo APRENDIZAGEM
+
+**Características:**
+- **Q-table é modificada:** A política Q-Learning atualiza os Q-values a cada passo durante a simulação
+- **Aprendizagem ativa:** O método `atualizar()` é chamado após cada ação, modificando a Q-table
+- **Exploração ativa:** Usa estratégia ε-greedy (explora com probabilidade ε, explora com probabilidade 1-ε)
+- **Q-tables são guardadas:** No final da execução, as Q-tables são guardadas em ficheiros JSON
+
+**Funcionamento:**
+```python
+# A cada passo:
+1. Agente observa estado s
+2. Escolhe ação a (ε-greedy: explora ou explora)
+3. Executa ação, recebe recompensa r, transita para estado s'
+4. Atualiza Q-table: Q[s][a] = Q[s][a] + α * (r + γ * max(Q[s']) - Q[s][a])
+5. Repete até fim do episódio
+6. No final: guarda Q-table em ficheiro JSON
+```
+
+**Uso:** Treinar agentes para aprender estratégias ótimas através de tentativa e erro
+
+**Exemplo:**
+```bash
+# Treinar agente (modifica Q-table durante execução)
+python -m sma.run farol --episodios 100
+# Q-table é guardada em: qtables/qtable_AgenteFarol_0.json
+```
+
+### Modo TESTE
+
+**Características:**
+- **Q-table é carregada:** A Q-table pré-treinada é carregada automaticamente do ficheiro JSON
+- **Q-table não é modificada:** O método `atualizar()` não faz nada (retorna imediatamente)
+- **Sem exploração:** ε = 0.0, sempre escolhe a melhor ação conhecida
+- **Política fixa:** Usa apenas o conhecimento já aprendido, sem aprender nada novo
+
+**Funcionamento:**
+```python
+# No início:
+1. Carrega Q-table do ficheiro JSON (qtables/qtable_AgenteFarol_0.json)
+
+# A cada passo:
+1. Agente observa estado s
+2. Sempre escolhe melhor ação: a = max(Q[s], key=Q[s].get)
+3. Executa ação, recebe recompensa r, transita para estado s'
+4. NÃO atualiza Q-table (modo TESTE, atualizar() retorna sem fazer nada)
+5. Repete até fim do episódio
+6. No final: NÃO guarda Q-table (já está guardada)
+```
+
+**Uso:** Avaliar desempenho de políticas pré-treinadas sem modificar o conhecimento aprendido
+
+**Exemplo:**
+```bash
+# Testar política treinada (usa Q-table existente, não a modifica)
+python -m sma.run farol --episodios 10
+# Q-table é carregada de: qtables/qtable_AgenteFarol_0.json
+# Q-table NÃO é modificada durante a execução
+# Q-table NÃO é guardada no final
+```
+
+**Métricas registadas:**
+- Número de passos até terminar
+- Recompensa total por episódio
+- Recompensa descontada
+- Taxa de sucesso
+
+### Comparação: APRENDIZAGEM vs TESTE
+
+| Aspecto | Modo APRENDIZAGEM | Modo TESTE |
+|--------|-------------------|------------|
+| **Q-table** | Modificada a cada passo | Carregada e nunca modificada |
+| **Aprendizagem** | Sim, atualiza Q-values | Não, apenas usa conhecimento existente |
+| **Exploração** | Sim (ε-greedy) | Não (ε=0, sempre melhor ação) |
+| **Carregamento** | Não carrega (começa vazia ou continua) | Carrega automaticamente do ficheiro |
+| **Guardar** | Guarda no final | Não guarda |
+| **Objetivo** | Aprender estratégias | Avaliar estratégias aprendidas |
+
+### Por que usar Modo TESTE?
+
+1. **Avaliação justa:** Testa o conhecimento aprendido sem modificá-lo
+2. **Reprodutibilidade:** Mesma Q-table sempre produz mesmos resultados
+3. **Comparação:** Permite comparar diferentes políticas treinadas
+4. **Análise:** Foca apenas em desempenho, não em aprendizagem
+5. **Eficiência:** Não precisa recalcular Q-values (mais rápido)
+
+---
+
+## Sincronização e Threads
+
+### Arquitetura de Threads
+
+Cada agente é uma thread independente que executa em paralelo:
+
+```python
+class Agente(threading.Thread, ABC):
+    def run(self):
+        while self._ativo:
+            # Espera barreira de percepção
+            self._barreira_percepcao.wait()
+            
+            # Decide ação
+            self._accao_pronta = self.age()
+            
+            # Espera barreira de ação
+            self._barreira_acao.wait()
+```
+
+### Barreiras de Sincronização
+
+**Barreira de Percepção:**
+- Garante que todos os agentes recebem observações antes de decidir ações
+- Evita condições de corrida na leitura do estado do ambiente
+
+**Barreira de Ação:**
+- Garante que todas as ações são decididas antes de serem executadas
+- Permite execução determinística das ações
+
+### Ciclo de Simulação
+
+```
+Para cada passo:
+    1. Simulador obtém observações para todos os agentes
+    2. Barreira de Percepção: agentes recebem observações
+    3. Barreira de Ação: agentes decidem ações
+    4. Simulador executa ações e calcula recompensas
+    5. Agentes recebem recompensas e atualizam políticas (se em modo APRENDIZAGEM)
+    6. Ambiente atualiza estado
+```
+
+### Vantagens da Abordagem
+
+- **Modularidade:** Agentes podem ser desenvolvidos independentemente
+- **Extensibilidade:** Fácil adicionar novos tipos de agentes
+- **Paralelização:** Preparado para execução paralela (embora atualmente sequencial no ambiente)
+- **Sincronização:** Garante consistência do estado
+
+---
+
+## Métricas de Desempenho
+
+### Métricas Implementadas
+
+O `RegistadorResultados` regista as seguintes métricas:
+
+1. **Passos por episódio:** Número de ações até terminar o episódio
+2. **Recompensa total:** Soma de todas as recompensas no episódio
+3. **Recompensa descontada:** Soma de recompensas com desconto temporal
+4. **Taxa de sucesso:** Percentagem de episódios que terminaram com sucesso
+5. **Valor total depositado:** Valor total de recursos depositados (Foraging)
+
+### Métricas por Problema
+
+#### Farol
+- **Objetivo:** Minimizar passos até chegar ao farol
+- **Métrica principal:** Número médio de passos
+- **Métrica secundária:** Taxa de sucesso
+
+#### Foraging
+- **Objetivo:** Maximizar recursos coletados e depositados
+- **Métrica principal:** Recompensa total média
+- **Métricas secundárias:** 
+  - Número de recursos coletados
+  - Valor total depositado
+  - Eficiência (recursos/ passos)
+
+### Exportação de Resultados
+
+Os resultados podem ser exportados para CSV para análise posterior:
+
+```python
+sim.registador_resultados.exportarCSV("resultados.csv")
+```
+
+**Via CLI:**
+- O CLI exporta automaticamente para `sma/resultados/{ambiente}_{modo}_cli.csv`
+- Formato: `episodio`, `passos`, `recompensa_total`, `recompensa_descontada`, `sucesso`, `valor_total_depositado`
+
+### Sistema Automático de Análise
+
+Foi implementado um sistema completo para gerar automaticamente:
+
+1. **Curvas de Aprendizagem:** Gráficos mostrando evolução do desempenho
+2. **Análise Estatística:** Relatórios com métricas detalhadas
+3. **Comparação de Políticas:** Gráficos comparativos entre diferentes políticas
+
+#### Geração Automática
+
+**Via CLI Interativo (Recomendado):**
+```bash
+./run.sh
+# Seleciona gráficos desejados no final do CLI
+# Gráficos são gerados e abertos automaticamente
+```
+
+**Durante a execução (Modo Manual):**
+```bash
+# Treinar e gerar análise automaticamente
+python -m sma.run farol --episodios 100 --gerar-analise
+```
+
+**A partir de CSV existente:**
+```bash
+# Gerar curva de aprendizagem
+python -m sma.gerar_analise resultados.csv --nome farol
+
+# Comparar duas políticas
+python -m sma.gerar_analise fixa.csv --comparar aprendida.csv
+```
+
+#### Curva de Aprendizagem
+
+O gráfico gerado inclui 4 painéis:
+
+1. **Passos por Episódio:**
+   - Mostra evolução do número de passos
+   - Inclui média móvel (janela de 10) para suavizar
+   - Ideal: deve diminuir ao longo do tempo
+
+2. **Recompensa por Episódio:**
+   - Mostra evolução da recompensa total
+   - Inclui média móvel para identificar tendências
+   - Ideal: deve aumentar ao longo do tempo
+
+3. **Taxa de Sucesso:**
+   - Mostra percentagem de episódios bem-sucedidos
+   - Média móvel para ver tendência
+   - Ideal: deve aumentar e estabilizar próximo de 100%
+
+4. **Estatísticas Comparativas:**
+   - Compara primeira metade vs segunda metade
+   - Mostra melhoria quantitativa
+   - Inclui passos médios, recompensa média, taxa de sucesso
+
+#### Análise em Modo Teste
+
+Para avaliar políticas pré-treinadas:
+
+```bash
+# Testar política treinada
+python -m sma.run farol --episodios 10 --gerar-analise
+```
+
+**Métricas geradas:**
+- Taxa de sucesso (percentagem)
+- Passos médios (com desvio padrão)
+- Recompensa média (com desvio padrão)
+- Análise por quartis (evolução ao longo dos episódios)
+
+#### Comparação de Políticas
+
+O sistema permite comparar automaticamente:
+
+- **Política Fixa vs Política Aprendida:**
+  ```bash
+  python -m sma.comparar_politicas config.json --episodios 10
+  python -m sma.gerar_analise resultados_fixa.csv --comparar resultados_aprendida.csv
+  ```
+
+**Gráfico comparativo inclui:**
+- Passos médios (com barras de erro)
+- Recompensa média (com barras de erro)
+- Taxa de sucesso
+- Evolução da recompensa (curvas sobrepostas)
+
+#### Ficheiros Gerados
+
+**Estrutura de saída:**
+```
+resultados/
+  ├── farol_aprendizagem.csv      # Dados brutos (modo manual)
+  ├── farol_aprendizagem_cli.csv  # Dados brutos (via CLI)
+  └── farol_teste_cli.csv
+
+analise/
+  ├── farol_aprendizagem_curva_aprendizagem.png
+  ├── farol_aprendizagem_relatorio.txt
+  ├── farol_teste_graficos.png    # Gráficos gerados via CLI
+  ├── foraging_aprendizagem_graficos.png
+  └── comparacao_politicas.png
+```
+
+**Formato CSV:**
+- Uma linha por episódio
+- Colunas: `episodio`, `passos`, `recompensa_total`, `recompensa_descontada`, `sucesso`, `valor_total_depositado`
+
+**Formato PNG:**
+- Gráficos de alta resolução (300 DPI)
+- Prontos para inclusão em relatórios
+
+**Formato TXT:**
+- Relatório textual com estatísticas
+- Análise por quartis
+- Comparação primeira vs segunda metade
+
+---
+
+## Extensibilidade
+
+### Adicionar Novo Ambiente
+
+1. Criar classe que herda de `Ambiente`
+2. Implementar métodos: `observacaoPara()`, `agir()`, `atualizacao()`
+3. Adicionar métodos específicos que os sensores podem usar
+
+### Adicionar Novo Sensor
+
+1. Criar classe que herda de `Sensor`
+2. Implementar método `ler(ambiente, agente)`
+3. Instalar no agente com `agente.instala(Sensor())`
+
+### Adicionar Novo Agente
+
+1. Criar classe que herda de `Agente`
+2. Implementar métodos: `cria()`, `age()`
+3. Instalar sensores apropriados
+4. Definir ações disponíveis
+
+### Adicionar Nova Política
+
+1. Criar classe que herda de `Politica`
+2. Implementar `selecionar_acao()`
+3. Opcionalmente implementar `atualizar()` para aprendizagem
+
+---
+
+## Comparação de Políticas
+
+### Objetivo
+
+O simulador permite comparar o desempenho entre políticas fixas (pré-programadas) e políticas aprendidas (Q-Learning), permitindo avaliar se a aprendizagem melhorou o desempenho do agente.
+
+### Script de Comparação
+
+Foi implementado o script `comparar_politicas.py` que:
+
+1. **Executa com política fixa:** Cria agentes com `PoliticaFixa` que sempre executam a mesma ação
+2. **Executa com política aprendida:** Carrega Q-tables pré-treinadas e executa em modo TESTE (sem exploração)
+3. **Compara resultados:** Mostra diferenças em todas as métricas
+
+### Uso
+
+```bash
+# Primeiro, treinar a política (modo APRENDIZAGEM)
+python -m sma.run farol --episodios 100
+
+# Depois, comparar políticas
+python -m sma.comparar_politicas config_farol.json --episodios 10
+```
+
+### Métricas Comparadas
+
+O script compara:
+- **Taxa de sucesso:** Percentagem de episódios que terminaram com sucesso
+- **Passos médios:** Número médio de ações até terminar
+- **Recompensa média:** Recompensa total média por episódio
+- **Recompensa descontada:** Recompensa com desconto temporal
+
+### Exemplo de Saída
+
+```
+COMPARAÇÃO: POLÍTICA FIXA vs POLÍTICA APRENDIDA
+======================================================================
+Métrica                         Fixa                 Aprendida         Diferença
+-------------------------------------------------------------------------------------
+Taxa de Sucesso (%)             0.00                 85.00             +85.00%
+Passos Médios                   200.0                45.2              -154.8
+Recompensa Média                -200.00               89.50             +289.50
+Recompensa Descontada           -198.50               88.20             +286.70
+======================================================================
+
+ANÁLISE:
+✅ Melhorias com política aprendida:
+   - Taxa de sucesso melhorou 85.00%
+   - Reduziu passos médios em 154.8
+   - Recompensa média aumentou 289.50
+```
+
+### Exportação de Resultados
+
+O script exporta automaticamente:
+- `resultados_fixa.csv`: Resultados da política fixa
+- `resultados_aprendida.csv`: Resultados da política aprendida
+
+Estes ficheiros podem ser usados para análise estatística mais detalhada ou visualização.
+
+---
+
+## Conclusão
+
+O simulador implementa uma arquitetura modular e extensível que cumpre todos os requisitos do enunciado:
+
+✅ **Interface completa:** Todos os métodos especificados estão implementados  
+✅ **CLI interativo:** Interface amigável para configuração e execução de simulações  
+✅ **Sensores funcionais:** Percepção local e global em ambos os ambientes  
+✅ **Modos distintos:** APRENDIZAGEM e TESTE funcionam corretamente  
+✅ **Threads sincronizadas:** Agentes executam em paralelo com sincronização adequada  
+✅ **Métricas registadas:** Desempenho é medido e pode ser exportado  
+✅ **Geração automática de gráficos:** Análise visual integrada no CLI  
+✅ **Comparação de políticas:** Script para comparar política fixa vs aprendida  
+✅ **Extensibilidade:** Fácil adicionar novos ambientes, agentes e sensores  
+
+A implementação permite que diferentes grupos possam usar ambientes e agentes uns dos outros sem modificações, cumprindo o objetivo de modularidade especificado no enunciado. O CLI interativo torna o simulador acessível tanto para utilizadores experientes quanto para iniciantes, simplificando significativamente o processo de configuração e análise de resultados.
+

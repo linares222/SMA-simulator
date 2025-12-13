@@ -1,0 +1,37 @@
+{
+    "modo_execucao": "APRENDIZAGEM",
+    "episodios": 500,
+    "max_passos": 200,
+    "visualizar": false,
+    "ambiente": {
+      "tipo": "FORAGING",
+      "largura": 10,
+      "altura": 8,
+      "ninho": [5, 4],
+      "recursos": [{ "x": 2, "y": 2, "valor": 5 }, { "x": 7, "y": 6, "valor": 10 }]
+    },
+    "agentes": [
+      {
+        "tipo": "FORAGER",
+        "id": "Forager_0",
+        "posicao_inicial": [0, 0],
+        "politica": {
+          "tipo": "qlearning",
+          "alfa": 0.5,
+          "gama": 0.95,
+          "epsilon": 0.35
+        }
+      },
+      {
+        "tipo": "FORAGER",
+        "id": "Forager_1",
+        "posicao_inicial": [9, 0],
+        "politica": {
+          "tipo": "qlearning",
+          "alfa": 0.5,
+          "gama": 0.95,
+          "epsilon": 0.35
+        }
+      }
+    ]
+  }

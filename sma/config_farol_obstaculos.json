@@ -1,0 +1,38 @@
+{
+    "modo_execucao": "APRENDIZAGEM",
+    "episodios": 100,
+    "max_passos": 100,
+    "visualizar": true,
+    "ambiente": {
+      "tipo": "FAROL",
+      "largura": 10,
+      "altura": 8,
+      "pos_farol": [7, 6],
+      "obstaculos": [[3, 3], [4, 4], [5, 3]]
+    },
+    "agentes": [
+      {
+        "tipo": "FAROL",
+        "id": "AgenteFarol_0",
+        "posicao_inicial": [0, 0],
+        "politica": {
+          "tipo": "qlearning",
+          "alfa": 0.3,
+          "gama": 0.9,
+          "epsilon": 0.2
+        }
+      },
+      {
+        "tipo": "FAROL",
+        "id": "AgenteFarol_1",
+        "posicao_inicial": [0, 7],
+        "politica": {
+          "tipo": "qlearning",
+          "alfa": 0.3,
+          "gama": 0.9,
+          "epsilon": 0.2
+        }
+      }
+    ]
+  }
+
