@@ -6,7 +6,7 @@ Implementation of a multi-agent system simulator with Q-Learning for navigation 
 
 - **Q-Learning**: Complete reinforcement learning implementation
 - **Multi-agent**: Support for multiple simultaneous agents
-- **Two environments**: Lighthouse (navigation) and Foraging (resource collection)
+- **Two environments**: Farol (navigation) and Foraging (resource collection)
 - **Interactive CLI**: User-friendly interface for configuration and execution
 - **Results analysis**: Automatic generation of graphs and metrics
 - **Mixed policies**: Comparison between Q-Learning agents and fixed policies
@@ -38,7 +38,7 @@ The simulator includes an interactive interface that guides the user through all
 ```
 
 The CLI allows you to configure:
-- **Environment:** LIGHTHOUSE or FORAGING
+- **Environment:** FAROL or FORAGING
 - **Mode:** LEARNING (train) or TEST (evaluate trained policy)
 - **Number of agents:** Total number of agents in the simulation
 - **Distribution:** How many agents use Q-Learning vs fixed policy
@@ -57,20 +57,20 @@ The CLI allows you to configure:
 ### Manual Mode (Legacy)
 
 ```bash
-# lighthouse environment (default)
-python -m sma.run lighthouse
+# farol environment (default)
+python -m sma.run farol
 
 # foraging environment
 python -m sma.run foraging
 
 # with visualization
-python -m sma.run lighthouse --visual
+python -m sma.run farol --visual
 
 # specify number of episodes
 python -m sma.run foraging -e 200
 
 # save results
-python -m sma.run lighthouse -o results.csv
+python -m sma.run farol -o results.csv
 ```
 
 ## Project Structure
@@ -86,10 +86,10 @@ sma/
     - visualizador.py     # Graphical visualization
     - resultados.py       # Metrics management
   agentes/           # Agent implementations
-    - agente_farol.py     # Agent for Lighthouse environment
+    - agente_farol.py     # Agent for Farol environment
     - agente_forager.py   # Agent for Foraging environment
   ambientes/         # Environment implementations
-    - farol.py            # Lighthouse navigation environment
+    - farol.py            # Farol navigation environment
     - foraging.py         # Foraging environment
   cli.py             # Interactive interface (CLI)
   comparar_politicas.py  # Policy comparison
@@ -104,13 +104,13 @@ requirements.txt     # Python dependencies
 
 ## Environments
 
-### Lighthouse
-Agents must navigate to the lighthouse using Q-Learning. They receive the relative direction to the lighthouse as observation through sensors. The goal is to reach the lighthouse in the minimum number of steps.
+### Farol
+Agents must navigate to the farol using Q-Learning. They receive the relative direction to the farol as observation through sensors. The goal is to reach the farol in the minimum number of steps.
 
 **Characteristics:**
-- Observation: Relative direction to lighthouse
+- Observation: Relative direction to farol
 - Actions: Move in 4 directions (North, South, East, West)
-- Reward: Positive when reaching the lighthouse, negative for steps without progress
+- Reward: Positive when reaching the farol, negative for steps without progress
 
 ### Foraging
 Agents collect resources and deposit them in the nest. More complex environment that involves collecting resources and depositing them in the nest.
