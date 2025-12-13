@@ -24,7 +24,12 @@ build/
 *.csv
 qtables/
 config_test_*.json
+config_*_teste.json
+sma/analise/*.png
+sma/resultados/
 
 # Jupyter
 .ipynb_checkpoints/
 
+# Cursor IDE
+.cursor/
