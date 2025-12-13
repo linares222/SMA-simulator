@@ -144,6 +144,32 @@ The `config_*.json` files define simulation parameters:
 - `visualizar`: true/false
 - Environment and agent parameters
 
+### Fine-Tuning Q-Learning Parameters
+
+You can adjust Q-Learning hyperparameters in the JSON config files under each agent's `politica` section:
+
+```json
+{
+  "agentes": [
+    {
+      "politica": {
+        "tipo": "qlearning",
+        "alfa": 0.3,      // Learning rate (0.1-0.5): higher = faster learning
+        "gama": 0.9,      // Discount factor (0.8-0.99): higher = more long-term planning
+        "epsilon": 0.2    // Exploration rate (0.05-0.4): higher = more exploration
+      }
+    }
+  ]
+}
+```
+
+**Parameter guidelines:**
+- **alfa (learning rate)**: 0.1-0.5. Higher values learn faster but may be unstable. Lower values are more stable but slower.
+- **gama (discount factor)**: 0.8-0.99. Higher values (0.95) plan ahead better. Lower values (0.7-0.8) focus on immediate rewards.
+- **epsilon (exploration)**: 0.05-0.4. Higher values explore more. Lower values exploit learned knowledge more.
+
+The Q-Learning implementation is in `sma/core/politicas.py` with inline comments explaining each parameter.
+
 ## Results Analysis
 
 The simulator automatically generates:

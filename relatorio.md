@@ -527,28 +527,53 @@ Política fixa que usa heurísticas baseadas nas observações dos sensores. Mai
 
 Implementação do algoritmo Q-Learning para aprendizagem por reforço.
 
-**Parâmetros:**
-- `alfa` (taxa de aprendizagem): 0.0 a 1.0 (padrão: 0.2)
-- `gama` (fator de desconto): 0.0 a 1.0 (padrão: 0.95)
-- `epsilon` (exploração): 0.0 a 1.0 (padrão: 0.1)
+**Parâmetros ajustáveis:**
+
+Os parâmetros podem ser configurados nos ficheiros JSON (`config_*.json`) na secção `politica` de cada agente:
+
+- **`alfa`** (taxa de aprendizagem): Controla a velocidade de atualização dos valores Q
+  - Valores típicos: 0.1 (conservador, aprende devagar) a 0.5 (agressivo, aprende rápido)
+  - Padrão: 0.2-0.3
+  - Valores mais altos = aprende mais rápido mas pode ser instável
+  - Valores mais baixos = aprende devagar mas mais estável
+
+- **`gama`** (fator de desconto): Controla a importância de recompensas futuras vs imediatas
+  - Valores típicos: 0.8-0.99
+  - Padrão: 0.9-0.95
+  - Valores mais altos (0.95) = pensa mais à frente, planeia melhor
+  - Valores mais baixos (0.7-0.8) = foca mais no imediato
+
+- **`epsilon`** (taxa de exploração): Probabilidade de escolher ação aleatória durante aprendizagem
+  - Valores típicos: 0.05-0.4
+  - Padrão: 0.1-0.2 (Farol), 0.2-0.35 (Foraging)
+  - Valores mais altos = explora mais, descobre novas estratégias
+  - Valores mais baixos = explora mais, usa o que já aprendeu
+  - Em modo TESTE, sempre 0 (só usa o que aprendeu)
 
 **Funcionamento:**
-1. **Seleção de ação:**
-   - Modo APRENDIZAGEM: ε-greedy (explora com probabilidade ε)
-   - Modo TESTE: Sempre escolhe a melhor ação (ε=0)
+1. **Seleção de ação (ε-greedy):**
+   - Modo APRENDIZAGEM: Com probabilidade `epsilon`, escolhe ação aleatória (explora). Caso contrário, escolhe a melhor ação conhecida (explora)
+   - Modo TESTE: Sempre escolhe a melhor ação (ε=0, sem exploração)
 
 2. **Atualização Q-value:**
    ```
    Q(s,a) = Q(s,a) + α * [r + γ * max(Q(s',a')) - Q(s,a)]
    ```
+   Onde:
+   - `Q(s,a)`: Valor atual da ação `a` no estado `s`
+   - `r`: Recompensa recebida
+   - `γ * max(Q(s',a'))`: Melhor valor futuro (descontado por gama)
+   - `α`: Taxa de aprendizagem (alfa)
 
 3. **Persistência:**
-   - Q-tables são guardadas em ficheiros JSON após aprendizagem
+   - Q-tables são guardadas em ficheiros JSON após aprendizagem (em `sma/qtables/`)
    - Q-tables são carregadas automaticamente em modo TESTE
+   - Formato: `qtable_{agente_id}.json`
 
 **Representação de estados:**
 - Estados são representados como strings usando `repr(obs.dados)`
 - Permite usar qualquer estrutura de dados como estado (tuplas, dicionários, etc.)
+- Cada combinação única de observação = um estado na Q-table
 
 ### Funcionamento do Q-Learning no Projeto
 
