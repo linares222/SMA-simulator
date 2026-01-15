@@ -13,6 +13,9 @@ from typing import Dict, Any, List
 import questionary
 from questionary import Style
 
+from sma.analise_limitacoes import demonstrar_limitacoes
+from sma.analise_qtables import analisar_qtables
+
 CLI_STYLE = Style(
     [
         ("qmark", "fg:cyan bold"),
@@ -44,6 +47,7 @@ def perguntar_modo_operacao() -> str:
         choices=[
             "Executar simulacao",
             "Comparar politicas (Fixa Inteligente vs Q-Learning)",
+            "Analise Avancada",
         ],
         style=CLI_STYLE,
     ).ask()
@@ -767,12 +771,50 @@ def executar_comparacao_politicas():
         if config_path.exists():
             config_path.unlink()
 
+    if config.get("snapshot_interval", 0) > 0:
+        print(f"   Snapshot Q-table: a cada {config['snapshot_interval']} eps")
+    print("\n" + "-" * 50 + "\n")
+
+
+def menu_analise():
+    """Sub-menu de análises avançadas."""
+    print("\n" + "=" * 50)
+    print("   ANÁLISE AVANÇADA")
+    print("=" * 50)
+
+    ambiente_analise = perguntar_ambiente()
+
+    opcao = questionary.select(
+        "Escolhe a ferramenta de análise:",
+        choices=[
+            "Comparar Melhores Valores (Q-Tables)",
+            "Demonstrar Limitações (Política Fixa)",
+            "Voltar",
+        ],
+        style=CLI_STYLE,
+    ).ask()
+
+    if opcao == "Comparar Melhores Valores (Q-Tables)":
+        analisar_qtables(ambiente_analise)
+    elif opcao == "Demonstrar Limitações (Política Fixa)":
+        demonstrar_limitacoes(ambiente_analise)
+
+    print("\n")
+    questionary.text(
+        "Pressiona Enter para voltar ao menu principal...", style=CLI_STYLE
+    ).ask()
+    main()
+
 
 def main():
     """Função principal do CLI."""
     mostrar_banner()
 
     modo_operacao = perguntar_modo_operacao()
+
+    if modo_operacao == "Analise Avancada":
+        menu_analise()
+        return
 
     if modo_operacao == "Comparar politicas (Fixa Inteligente vs Q-Learning)":
         executar_comparacao_politicas()

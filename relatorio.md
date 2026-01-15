@@ -176,6 +176,22 @@ Se o utilizador selecionar gráficos:
 - **Validação:** Todas as entradas são validadas (números positivos, limites, etc.)
 - **Erros de Importação:** Avisos amigáveis se Matplotlib não estiver disponível
 
+### Análise Avançada
+
+O CLI inclui agora um menu de **Análise Avançada** com ferramentas para diagnóstico profundo:
+
+#### 1. Comparação de Melhores Valores (Q-Tables)
+Analisa todas as tabelas Q guardadas na pasta `sma/qtables/` para verificar a convergência do treino.
+- **Estatísticas:** Mostra valores Q máximos e médios (indicador de confiança do agente).
+- **Consenso:** Calcula a percentagem de estados onde todos os agentes concordam na mesma melhor ação.
+- **Divergência:** Mostra exemplos de estados onde os agentes discordam.
+
+#### 2. Demonstração de Limitações (Política Fixa)
+Executa uma simulação num cenário "Armadilha" desenhado especificamente para expor as falhas da heurística fixa.
+- **Cenário:** Agente começa dentro de um 'U' de obstáculos com o objetivo do outro lado.
+- **Falha:** A heurística gananciosa tenta aproximar-se do alvo e bate na parede, recusando-se a afastar-se temporariamente para contornar o obstáculo.
+- **Objetivo:** Demonstrar visualmente a necessidade de algoritmos de aprendizagem (como Q-Learning) que conseguem resolver estes mínimos locais.
+
 ### Exemplo de Uso
 
 ```

@@ -12,6 +12,7 @@ Implementation of a multi-agent system simulator with Q-Learning for navigation 
 - **Mixed policies**: Comparison between Q-Learning agents and fixed policies
 - **Visualization**: Graphical representation of environments and agents
 - **Agent communication**: Message passing system between agents (broadcast and direct messaging)
+- **Advanced Analysis**: Tools to inspect Q-tables and demonstrate policy limitations (Traps)
 
 ## Requirements
 
