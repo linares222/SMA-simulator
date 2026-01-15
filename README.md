@@ -104,6 +104,9 @@ sma/
   cli.py             # Interactive interface (CLI)
   comparar_politicas.py  # Policy comparison
   gerar_analise.py   # Analysis and graph generation
+  loader.py          # Simulation loader
+  main.py            # Main entry point
+  run.py             # Simulation script
   config_*.json      # Configuration files
   resultados/        # Exported results (CSV)
   analise/           # Generated graphs (PNG)

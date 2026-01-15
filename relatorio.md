@@ -90,26 +90,30 @@ O CLI guia o utilizador através de uma série de perguntas:
    - Comparar políticas: Compara política fixa inteligente vs Q-Learning
 
 3. **Modo de Execução (se simulação normal):**
-   - APRENDIZAGEM: Treinar agentes com Q-Learning
+   - APRENDIZAGEM: Treinar agentes
    - TESTE: Avaliar políticas pré-treinadas
 
-4. **Número de Agentes:**
+4. **Algoritmo de Aprendizagem (se APRENDIZAGEM):**
+   - Q-Learning (Reforço)
+   - Algoritmo Genético (Evolutivo)
+
+5. **Número de Agentes:**
    - Quantidade total de agentes na simulação
 
-5. **Distribuição de Políticas (se simulação normal):**
+6. **Distribuição de Políticas (se simulação normal):**
    - **Modo APRENDIZAGEM:** Quantos agentes usam Q-Learning vs política fixa
    - **Modo TESTE:** Quantos agentes usam Q-table treinada vs política fixa
    - O CLI mostra quantas Q-tables estão disponíveis para o ambiente
    - Limita o número de agentes com Q-Learning ao número de Q-tables disponíveis
 
-6. **Episódios:**
+7. **Episódios:**
    - Número de episódios a executar (padrão: 100)
 
-7. **Máximo de Passos:**
+8. **Máximo de Passos:**
    - Número máximo de passos por episódio (padrão: 200)
    - Controla quando um episódio termina por timeout
 
-8. **Gráficos (se simulação normal):**
+9. **Gráficos (se simulação normal):**
    - Seleção de quais gráficos gerar no final:
      - Curva de Aprendizagem (Recompensa)
      - Passos por Episódio
@@ -482,6 +486,11 @@ Os agentes são implementados como threads independentes (`threading.Thread`), p
 - `-2.0`: Tentou coletar/depositar em condições inválidas
 - `-5.0`: Tentou mover para fora dos limites ou para obstáculo
 
+**Configuração Dinâmica:**
+- **Escala com Agentes:** O tamanho do mapa e o número de recursos ajustam-se automaticamente ao número de agentes.
+- **Recursos:** `max(4, n_agentes * 2)` recursos gerados aleatoriamente (evitando o ninho).
+- **Mapa:** Tamanho aumenta para 15x15 (padrão) para acomodar mais agentes.
+
 **Condição de término:**
 - Todos os recursos foram coletados E todos os agentes depositaram suas cargas
 
@@ -514,21 +523,15 @@ Política pré-programada que sempre retorna a mesma ação.
 
 Política fixa que usa heurísticas baseadas nas observações dos sensores. Mais inteligente que `PoliticaFixa` e útil para comparação com políticas aprendidas.
 
-**Heurísticas para Farol:**
-- Move na direção do farol (usando `dir_farol` da observação)
-- Evita obstáculos (verifica `viz` antes de mover)
-- Prioriza movimento horizontal (Este/Oeste) antes de vertical (Norte/Sul)
-- Se bloqueado, tenta contornar obstáculos
+**Heurísticas Melhoradas:**
+- **Navegação Baseada em Distância:** Calcula a distância Manhattan para o alvo (farol, recurso ou ninho) para cada movimento possível.
+- **Evitamento de Obstáculos:** Verifica se a posição alvo está livre antes de mover.
+- **Desempate Aleatório:** Se múltiplos movimentos tiverem a mesma distância mínima para o alvo, escolhe aleatoriamente entre eles para evitar loops infinitos.
+- **Estados Especiais (Foraging):**
+  - Se está no ninho e carregando: deposita
+  - Se está num recurso e não está carregando: coleta
 
-**Heurísticas para Foraging:**
-- Se está no ninho e carregando: deposita
-- Se está num recurso e não está carregando: coleta
-- Se está carregando: move na direção do ninho
-- Se não está carregando: move na direção do recurso mais próximo
-- Evita obstáculos
-- Se há recurso na vizinhança, tenta ir para ele
-
-**Uso:** Comparação com políticas aprendidas, baseline inteligente
+**Uso:** Comparação com políticas aprendidas, baseline robusta.
 
 **Configuração:**
 ```json
@@ -539,7 +542,29 @@ Política fixa que usa heurísticas baseadas nas observações dos sensores. Mai
 }
 ```
 
-#### 3. `PoliticaQLearning`
+#### 3. `PoliticaGenetica`
+
+Política evolutiva que usa um Algoritmo Genético para otimizar pesos de um modelo linear de decisão.
+
+**Características:**
+- **Cromossoma:** Vetor de números reais (pesos) que mapeia features para preferências de ação.
+- **Modelo Linear:** `Score(acao) = dot(Pesos_acao, Features) + Bias_acao`. A ação com maior score é selecionada.
+- **Features (Input):**
+  1. Direção normalizada para o objetivo (X, Y)
+  2. Sensores de obstáculo nas 4 direções (N, S, E, O)
+  3. Estados de posição (no farol, no ninho, no recurso)
+  4. **Memória:** Última ação realizada (One-Hot encoding)
+  5. **Sinal de Bloqueio:** Indica se a última ação resultou em bloqueio
+
+**Evolução:**
+- **População:** 50 indivíduos (configurável)
+- **Seleção:** Torneio
+- **Crossover:** Aritmético (média dos pais)
+- **Mutação:** Adição de ruído gaussiano (taxa 0.1)
+
+**Uso:** Alternativa ao Q-Learning para espaços de estados grandes ou contínuos.
+
+#### 4. `PoliticaQLearning`
 
 Implementação do algoritmo Q-Learning para aprendizagem por reforço.
 
