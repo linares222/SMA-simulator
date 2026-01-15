@@ -3,10 +3,11 @@ import matplotlib.pyplot as plt
 
 
 class Visualizador2D:
-    def __init__(self):
+    def __init__(self, intervalo: float = 0.1):
         plt.ion()
         self.fig, self.ax = plt.subplots()
         self.fig.canvas.manager.set_window_title("SMA")
+        self.intervalo = intervalo
 
     def render(self, ambiente, agentes: List):
         if not hasattr(ambiente, "matriz"):
@@ -46,7 +47,7 @@ class Visualizador2D:
 
         self.ax.set_xlim(-0.5, ambiente.largura - 0.5)
         self.ax.set_ylim(-0.5, ambiente.altura - 0.5)
-        plt.pause(0.1)
+        plt.pause(self.intervalo)
         self.fig.canvas.draw()
 
     def finalizar(self):

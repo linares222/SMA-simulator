@@ -5,9 +5,14 @@ from ..core.tipos import Accao, TipoAccao
 
 
 class AmbienteForaging(Ambiente):
-    def __init__(self, largura: int, altura: int, ninho: Tuple[int, int],
-                 recursos: Dict[Tuple[int, int], int],
-                 obstaculos: Dict[Tuple[int, int], int] | None = None):
+    def __init__(
+        self,
+        largura: int,
+        altura: int,
+        ninho: Tuple[int, int],
+        recursos: Dict[Tuple[int, int], int],
+        obstaculos: Dict[Tuple[int, int], int] | None = None,
+    ):
         self.largura = largura
         self.altura = altura
         self.ninho = ninho
@@ -16,7 +21,7 @@ class AmbienteForaging(Ambiente):
         self.obstaculos = obstaculos if obstaculos else {}
         self.terminou = False
         self._ultimo_valor_depositado = 0.0
-        
+
         self.matriz = np.zeros((altura, largura), dtype=int)
         for (x, y), _ in self.recursos.items():
             self.matriz[y, x] = 2
@@ -42,7 +47,7 @@ class AmbienteForaging(Ambiente):
         dir_ninho = (int(np.sign(self.ninho[0] - x)), int(np.sign(self.ninho[1] - y)))
         dist_ninho = abs(self.ninho[0] - x) + abs(self.ninho[1] - y)
 
-        dir_rec, dist_rec = (0, 0), float('inf')
+        dir_rec, dist_rec = (0, 0), float("inf")
         for rx, ry in self.recursos:
             d = abs(rx - x) + abs(ry - y)
             if d < dist_rec:
@@ -65,7 +70,13 @@ class AmbienteForaging(Ambiente):
         recomp = -0.1
         self._ultimo_valor_depositado = 0.0
 
-        if accao.tipo in {TipoAccao.MoverN, TipoAccao.MoverS, TipoAccao.MoverE, TipoAccao.MoverO, TipoAccao.Stay}:
+        if accao.tipo in {
+            TipoAccao.MoverN,
+            TipoAccao.MoverS,
+            TipoAccao.MoverE,
+            TipoAccao.MoverO,
+            TipoAccao.Stay,
+        }:
             if accao.tipo == TipoAccao.MoverN:
                 ny = y - 1
             elif accao.tipo == TipoAccao.MoverS:
@@ -91,12 +102,17 @@ class AmbienteForaging(Ambiente):
                         recomp += 0.5
                 elif self.recursos:
                     d_ant = min(abs(rx - x) + abs(ry - y) for rx, ry in self.recursos)
-                    d_novo = min(abs(rx - nx) + abs(ry - ny) for rx, ry in self.recursos)
+                    d_novo = min(
+                        abs(rx - nx) + abs(ry - ny) for rx, ry in self.recursos
+                    )
                     if d_novo < d_ant:
                         recomp += 0.3
 
         elif accao.tipo == TipoAccao.Coletar:
-            if agente.posicao in self.recursos and getattr(agente, "carregando", 0) == 0:
+            if (
+                agente.posicao in self.recursos
+                and getattr(agente, "carregando", 0) == 0
+            ):
                 val = self.recursos.pop(agente.posicao)
                 self.matriz[agente.posicao[1], agente.posicao[0]] = 0
                 agente.carregando = val
@@ -114,7 +130,7 @@ class AmbienteForaging(Ambiente):
                 return -2.0
 
         return recomp
-    
+
     def get_ultimo_valor_depositado(self) -> float:
         return self._ultimo_valor_depositado
 

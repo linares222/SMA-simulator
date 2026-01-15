@@ -14,7 +14,7 @@
       {
         "tipo": "FAROL",
         "id": "AgenteFarol_0",
-        "posicao_inicial": [0, 0],
+        "posicao_inicial": [0, 4],
         "politica": {
           "tipo": "qlearning",
           "alfa": 0.3,

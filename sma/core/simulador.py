@@ -22,6 +22,7 @@ class MotorDeSimulacao:
         self.visualizador = None
         self.diretorio_qtables: Optional[str] = None
         self._comunicacao_ativa = True
+        self.snapshot_interval = 0  # 0 = desativado, N = guardar a cada N episódios
 
     @staticmethod
     def cria(cfg_path: str) -> "MotorDeSimulacao":
@@ -36,13 +37,15 @@ class MotorDeSimulacao:
     def listaAgentes(self) -> List[Agente]:
         """Retorna a lista de agentes no simulador."""
         return self.agentes
-    
+
     def enviar_mensagem(self, de_agente: Agente, para_agente: Agente, mensagem: str):
         """Envia uma mensagem de um agente para outro."""
         if para_agente in self.agentes:
             para_agente.comunica(mensagem, de_agente)
-    
-    def broadcast_mensagem(self, de_agente: Agente, mensagem: str, excluir_remetente: bool = True):
+
+    def broadcast_mensagem(
+        self, de_agente: Agente, mensagem: str, excluir_remetente: bool = True
+    ):
         """Envia uma mensagem de um agente para todos os outros agentes."""
         for ag in self.agentes:
             if not excluir_remetente or ag != de_agente:
@@ -50,7 +53,7 @@ class MotorDeSimulacao:
 
     def _propagar_modo(self):
         for ag in self.agentes:
-            if hasattr(ag, 'politica'):
+            if hasattr(ag, "politica"):
                 ag.politica.set_modo(self.modo)
 
     def _caminho_qtable(self, ag: Agente) -> str:
@@ -62,46 +65,71 @@ class MotorDeSimulacao:
 
     def guardar_politicas(self):
         from .politicas import PoliticaQLearning
+        from .politica_genetica import PoliticaGenetica
+
         guardadas = 0
         for ag in self.agentes:
             if isinstance(ag.politica, PoliticaQLearning):
                 ag.politica.guardar(self._caminho_qtable(ag))
                 guardadas += 1
+            elif isinstance(ag.politica, PoliticaGenetica):
+                caminho = self._caminho_qtable(ag).replace("qtable_", "genetico_")
+                ag.politica.guardar(caminho)
+                guardadas += 1
         if guardadas > 0:
-            print(f"\nTotal: {guardadas} Q-table(s) guardada(s) de {len(self.agentes)} agente(s)")
+            print(
+                f"\nTotal: {guardadas} política(s) guardada(s) de {len(self.agentes)} agente(s)"
+            )
+
+    def guardar_snapshots(self, episodio: int):
+        """Guarda snapshots das Q-tables no episódio especificado."""
+        from .politicas import PoliticaQLearning
+
+        for ag in self.agentes:
+            if isinstance(ag.politica, PoliticaQLearning):
+                ag.politica.guardar_snapshot(self._caminho_qtable(ag), episodio)
 
     def carregar_politicas(self):
         from .politicas import PoliticaFixaInteligente, PoliticaQLearning
-        
+
         for ag in self.agentes:
             if isinstance(ag.politica, PoliticaQLearning):
                 sucesso = ag.politica.carregar(self._caminho_qtable(ag))
                 if not sucesso and self.modo == ModoExecucao.TESTE:
-                    tipo_agente = "FAROL" if "Farol" in ag.__class__.__name__ or "FAROL" in str(ag.id).upper() else "FORAGER"
-                    print(f"Aviso: Agente {ag.id} sem Q-table, usando politica fixa inteligente")
+                    tipo_agente = (
+                        "FAROL"
+                        if "Farol" in ag.__class__.__name__
+                        or "FAROL" in str(ag.id).upper()
+                        else "FORAGER"
+                    )
+                    print(
+                        f"Aviso: Agente {ag.id} sem Q-table, usando politica fixa inteligente"
+                    )
                     ag.politica = PoliticaFixaInteligente(tipo_agente)
 
     def _reset_episodio(self):
         self.ambiente.terminou = False
         for ag in self.agentes:
             ag.posicao = ag.posicao_inicial
-            if hasattr(ag, 'carregando'):
+            if hasattr(ag, "carregando"):
                 ag.carregando = 0
 
-        if hasattr(self.ambiente, 'recursos_iniciais'):
+        if hasattr(self.ambiente, "recursos_iniciais"):
             self.ambiente.recursos = dict(self.ambiente.recursos_iniciais)
-            self.ambiente.matriz = np.zeros((self.ambiente.altura, self.ambiente.largura), dtype=int)
+            self.ambiente.matriz = np.zeros(
+                (self.ambiente.altura, self.ambiente.largura), dtype=int
+            )
             for (x, y), _ in self.ambiente.recursos.items():
                 self.ambiente.matriz[y, x] = 2
-            if hasattr(self.ambiente, 'obstaculos'):
+            if hasattr(self.ambiente, "obstaculos"):
                 for (x, y), _ in self.ambiente.obstaculos.items():
                     self.ambiente.matriz[y, x] = 9
-            if hasattr(self.ambiente, 'ninho'):
+            if hasattr(self.ambiente, "ninho"):
                 self.ambiente.matriz[self.ambiente.ninho[1], self.ambiente.ninho[0]] = 3
 
     def executa(self):
         self._propagar_modo()
-        
+
         if self.modo == ModoExecucao.TESTE:
             self.carregar_politicas()
 
@@ -130,29 +158,33 @@ class MotorDeSimulacao:
                     self.barreira_percepcao.wait()
                     self.barreira_acao.wait()
 
-                    if hasattr(self.ambiente, '_agentes'):
+                    if hasattr(self.ambiente, "_agentes"):
                         self.ambiente._agentes = self.agentes
-                    if hasattr(self.ambiente, '_simulador'):
+                    if hasattr(self.ambiente, "_simulador"):
                         self.ambiente._simulador = self
-                    
+
                     for ag in self.agentes:
                         accao = ag._accao_pronta
                         ag._accao_anterior = accao
                         recomp = self.ambiente.agir(accao, ag)
                         novo_obs = ag.observar(self.ambiente)
                         ag.observacao(novo_obs)
-                        
+
                         # Processar comunicação após ação
-                        if self._comunicacao_ativa and hasattr(ag, 'processar_comunicacao'):
+                        if self._comunicacao_ativa and hasattr(
+                            ag, "processar_comunicacao"
+                        ):
                             ag.processar_comunicacao(self, self.ambiente)
-                        
+
                         ag.avaliacaoEstadoAtual(recomp)
-                        val_dep = getattr(self.ambiente, 'get_ultimo_valor_depositado', lambda: 0.0)()
+                        val_dep = getattr(
+                            self.ambiente, "get_ultimo_valor_depositado", lambda: 0.0
+                        )()
                         self.registador_resultados.registar_passo(recomp, val_dep)
 
                     self.ambiente.atualizacao()
-                    
-                    if hasattr(self.ambiente, 'verificar_termino'):
+
+                    if hasattr(self.ambiente, "verificar_termino"):
                         self.ambiente.verificar_termino(self.agentes)
 
                     if self.visualizador:
@@ -168,7 +200,25 @@ class MotorDeSimulacao:
                 if self.visualizador:
                     self.visualizador.render(self.ambiente, self.agentes)
 
-                print(f"Ep {ep+1}/{self.episodios}: passos={met.passos}, recomp={met.recompensa_total:.2f}, sucesso={met.sucesso}", flush=True)
+                print(
+                    f"Ep {ep + 1}/{self.episodios}: passos={met.passos}, recomp={met.recompensa_total:.2f}, sucesso={met.sucesso}",
+                    flush=True,
+                )
+
+                # Guardar snapshots periódicos durante aprendizagem
+                if (
+                    self.modo == ModoExecucao.APRENDIZAGEM
+                    and self.snapshot_interval > 0
+                    and (ep + 1) % self.snapshot_interval == 0
+                ):
+                    self.guardar_snapshots(ep + 1)
+
+                # Callback para política genética (troca de indivíduo)
+                from .politica_genetica import PoliticaGenetica
+
+                for ag in self.agentes:
+                    if isinstance(ag.politica, PoliticaGenetica):
+                        ag.politica.fim_episodio()
 
         finally:
             for a in self.agentes:
@@ -180,7 +230,7 @@ class MotorDeSimulacao:
                 pass
 
         self.registador_resultados.imprimir_resumo()
-        
+
         if self.modo == ModoExecucao.APRENDIZAGEM:
             self.guardar_politicas()
 
