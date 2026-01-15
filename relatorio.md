@@ -837,15 +837,15 @@ Q = {
 #### Vantagens e Limitações
 
 **Vantagens:**
-- ✅ Aprende estratégias ótimas através de tentativa e erro
-- ✅ Não precisa de modelo do ambiente
-- ✅ Funciona com qualquer estrutura de observação
-- ✅ Persistência (pode guardar e carregar conhecimento)
+- Aprende estratégias ótimas através de tentativa e erro
+- Não precisa de modelo do ambiente
+- Funciona com qualquer estrutura de observação
+- Persistência (pode guardar e carregar conhecimento)
 
 **Limitações:**
-- ⚠️ Espaço de estados pode ser muito grande (cada combinação única de observação = novo estado)
-- ⚠️ Pode precisar de muitos episódios para convergir
-- ⚠️ Exploração vs Exploração: muito epsilon = lento, pouco epsilon = pode ficar preso em sub-ótimo
+- Espaço de estados pode ser muito grande (cada combinação única de observação = novo estado)
+- Pode precisar de muitos episódios para convergir
+- Exploração vs Exploração: muito epsilon = lento, pouco epsilon = pode ficar preso em sub-ótimo
 
 ---
 
@@ -1166,6 +1166,143 @@ O sistema permite comparar automaticamente:
 - Taxa de sucesso
 - Evolução da recompensa (curvas sobrepostas)
 
+---
+
+## Gráficos Disponíveis e Interpretação
+
+Esta secção detalha todos os gráficos disponíveis no simulador, o que cada um mostra e como interpretar os resultados para cada ambiente.
+
+### Gráficos do Modo Simulação (CLI)
+
+Ao executar uma simulação via CLI (`./run.sh`), o utilizador pode selecionar 4 tipos de gráficos:
+
+#### 1. Curva de Aprendizagem (Recompensa)
+
+| Característica | Descrição |
+|----------------|-----------|
+| **Eixo X** | Número do episódio |
+| **Eixo Y** | Recompensa total obtida no episódio |
+| **Linha Transparente** | Valores reais (com ruído natural) |
+| **Linha Destacada** | Média móvel (janela de 10 episódios) |
+
+**Interpretação por Ambiente:**
+
+| Ambiente | O que esperar | Sinal de Sucesso | Sinal de Problema |
+|----------|---------------|------------------|-------------------|
+| **Farol** | Recompensa sobe de ~-200 (timeout) para ~+90 (chegar rápido) | Curva ascendente estável | Curva plana ou descendente |
+| **Foraging** | Recompensa varia com valor dos recursos depositados | Curva ascendente com maior variância | Curva negativa constante (não deposita) |
+
+**Ponto de Convergência:** Quando a linha da média móvel estabiliza, o agente atingiu o seu desempenho máximo com os parâmetros atuais.
+
+---
+
+#### 2. Passos por Episódio
+
+| Característica | Descrição |
+|----------------|-----------|
+| **Eixo X** | Número do episódio |
+| **Eixo Y** | Número de ações executadas até terminar o episódio |
+| **Linha Destacada** | Média móvel (janela de 10 episódios) |
+
+**Interpretação por Ambiente:**
+
+| Ambiente | O que esperar | Sinal de Sucesso | Sinal de Problema |
+|----------|---------------|------------------|-------------------|
+| **Farol** | Passos devem diminuir de ~200 (max) para ~10-30 (ótimo) | Curva descendente acentuada | Curva constante perto do máximo (timeout) |
+| **Foraging** | Passos podem variar - menos passos nem sempre é melhor | Estabilização num valor razoável | Sempre no máximo (agente perdido) |
+
+**Nota:** No Foraging, um agente eficiente pode usar mais passos se recolher mais recursos. No Farol, menos passos é sempre melhor.
+
+---
+
+#### 3. Recompensa Descontada (γ = 0.99)
+
+| Característica | Descrição |
+|----------------|-----------|
+| **Eixo X** | Número do episódio |
+| **Eixo Y** | Soma de recompensas com desconto temporal: Σ(γ^t × r_t) |
+| **Fator de Desconto** | γ = 0.99 (usado no Q-Learning) |
+
+**Interpretação:**
+
+- **O que mede:** Penaliza soluções lentas. Uma recompensa de +99 no passo 100 vale menos do que +99 no passo 10.
+- **Farol:** Recompensa descontada alta = caminho curto até ao farol.
+- **Foraging:** Recompensa descontada alta = depositou recursos rapidamente.
+
+**Comparação com Recompensa Total:**
+- Se a recompensa total é alta mas a descontada é baixa → o agente consegue, mas demora muito.
+- Se ambas são altas → o agente é eficiente.
+
+---
+
+#### 4. Taxa de Sucesso Acumulada
+
+| Característica | Descrição |
+|----------------|-----------|
+| **Eixo X** | Número do episódio |
+| **Eixo Y** | Percentagem de episódios bem-sucedidos até ao momento |
+| **Linha de Referência** | 50% (linha tracejada cinza) |
+
+**Interpretação por Ambiente:**
+
+| Ambiente | Critério de Sucesso | Taxa Esperada (Treinado) |
+|----------|---------------------|--------------------------|
+| **Farol** | Agente chegou ao farol antes do timeout | >90% após 50-100 episódios |
+| **Foraging** | Todos os recursos foram depositados no ninho | Depende do número de recursos/agentes |
+
+**Leitura do Gráfico:**
+- **Subida rápida inicial:** O agente está a aprender rapidamente.
+- **Estabilização perto de 100%:** O agente dominou o problema.
+- **Estabilização abaixo de 50%:** O agente não aprendeu efetivamente (verificar parâmetros).
+
+---
+
+### Gráficos do Modo Comparação (6 painéis)
+
+Ao escolher "Comparar políticas" no CLI, são gerados 6 gráficos lado a lado:
+
+#### Linha Superior (Barras de Comparação)
+
+| Gráfico | O que compara | Interpretação |
+|---------|---------------|---------------|
+| **Passos Médios** | Barra laranja (Fixa) vs Barra azul (Q-Learning) | Barra mais baixa = política mais eficiente |
+| **Taxa de Sucesso** | Percentagem de sucesso de cada política | Barra mais alta = política mais confiável |
+| **Recompensa Média** | Recompensa total média de cada política | Barra mais alta = política mais lucrativa |
+
+**Barras de Erro:** As linhas verticais sobre as barras mostram o desvio padrão. Barras de erro grandes = resultados inconsistentes.
+
+#### Linha Inferior (Evolução Temporal)
+
+| Gráfico | O que mostra | Interpretação |
+|---------|--------------|---------------|
+| **Evolução dos Passos** | Linhas sobrepostas ao longo dos episódios | A linha que desce mais = aprende a ser mais eficiente |
+| **Evolução da Recompensa** | Linhas sobrepostas ao longo dos episódios | A linha que sobe mais = aprende a maximizar ganho |
+| **Evolução da Recompensa Descontada** | Linhas sobrepostas ao longo dos episódios | A linha mais alta = consegue resultados mais rápido |
+
+**Cores:**
+- **Laranja:** Política Fixa Inteligente (baseline)
+- **Azul:** Política Aprendida (Q-Learning)
+
+**Exemplo de Interpretação:**
+```
+Se a linha azul (Q-Learning) está consistentemente acima da laranja (Fixa):
+→ A aprendizagem melhorou o desempenho relativamente à heurística fixa.
+
+Se as linhas se cruzam ou estão próximas:
+→ A política fixa é competitiva para este problema (ou o treino foi insuficiente).
+```
+
+---
+
+### Ficheiros de Saída
+
+| Modo | Ficheiros Gerados | Localização |
+|------|-------------------|-------------|
+| Simulação Normal | `{ambiente}_{modo}_graficos.png` | `sma/analise/` |
+| Comparação | `comparacao_politicas.png` | `sma/resultados/` |
+| Dados Brutos | `{ambiente}_{modo}_cli.csv` | `sma/resultados/` |
+| Q-Tables | `qtable_{agente_id}.json` | `sma/qtables/` |
+
 #### Ficheiros Gerados
 
 **Estrutura de saída:**
@@ -1292,7 +1429,7 @@ Recompensa Descontada           -198.50               88.20             +286.70
 ======================================================================
 
 ANÁLISE:
-✅ Melhorias com política aprendida:
+Melhorias com política aprendida:
    - Taxa de sucesso melhorou 85.00%
    - Reduziu passos médios em 154.8
    - Recompensa média aumentou 289.50
@@ -1325,19 +1462,100 @@ Os ficheiros CSV podem ser usados para análise estatística mais detalhada ou v
 
 ---
 
+## Questões Relevantes a Considerar
+
+Esta secção responde às questões colocadas no enunciado do projeto.
+
+### 1. Como irá modelar a percepção do agente em cada ambiente?
+
+A percepção foi modelada usando um **sistema híbrido de percepção local e global**, implementado através de sensores modulares:
+
+| Ambiente | Percepção Local | Percepção Global |
+|----------|-----------------|------------------|
+| **Farol** | Vizinhança 8-direccional (vizinhança imediata com tipo de célula: vazio, obstáculo, farol, fora de limites) | Direção normalizada para o farol `(dx, dy)` onde `dx, dy ∈ {-1, 0, 1}` |
+| **Foraging** | Vizinhança 8-direccional (vizinhança imediata com tipo de célula: vazio, recurso, ninho, obstáculo, fora de limites) | Direção para o ninho, direção para o recurso mais próximo, distância ao ninho (cap de 10), estado de carga |
+
+**Justificação da Escolha:**
+- A percepção **local** permite ao agente evitar obstáculos e reagir ao ambiente imediato, o que é essencial para navegação segura.
+- A percepção **global** (direção ao objetivo) permite ao agente orientar-se mesmo sem ter uma visão completa do mapa, simulando um comportamento realista de navegação por compasso ou feromônios.
+- Esta combinação é inspirada em sistemas biológicos (ex: formigas usam feromônios locais + orientação solar global).
+
+**Impacto na Aprendizagem:**
+- O espaço de estados é finito e relativamente pequeno (produto cartesiano de direções e vizinhança discreta), tornando o Q-Learning convergente.
+- A representação como string (`repr(obs.dados)`) permite usar qualquer estrutura de dados complexa como chave na Q-table.
+
+---
+
+### 2. Quais são as métricas de desempenho mais relevantes para cada problema?
+
+| Métrica | Farol | Foraging | Justificação |
+|---------|-------|----------|--------------|
+| **Taxa de Sucesso** | Principal | Relevante | Indica se o agente consegue atingir o objetivo (farol ou depositar todos os recursos). |
+| **Passos Médios** | Principal | Secundária | No Farol, menos passos = mais eficiente. No Foraging, o número de passos é menos importante se o agente recolher mais recursos. |
+| **Recompensa Total** | Secundária | Principal | No Foraging, a recompensa reflete o valor total depositado. No Farol, é derivada dos passos. |
+| **Recompensa Descontada (γ=0.99)** | Relevante | Relevante | Penaliza soluções lentas, incentivando eficiência temporal. Importante para comparar políticas. |
+
+**Farol:**
+- Objetivo claro e único (chegar ao farol), portanto a **taxa de sucesso** e **passos médios** são as métricas primárias.
+- Faz sentido usar um fator de desconto (γ) alto (0.95-0.99) para incentivar caminhos curtos.
+
+**Foraging:**
+- Múltiplos sub-objetivos (coletar, transportar, depositar), portanto a **recompensa total** (que soma todos os valores depositados) é a métrica primária.
+- O número de passos é menos crítico, mas a recompensa descontada ainda ajuda a evitar comportamentos desnecessariamente lentos.
+
+---
+
+### 3. Será que os algoritmos usados reagem do mesmo modo a diferentes métricas?
+
+**Não, os algoritmos reagem de forma diferente às métricas, e esta diferença é fundamental para a escolha do algoritmo adequado:**
+
+| Algoritmo | Sensibilidade a Passos | Sensibilidade a Recompensa | Observações |
+|-----------|------------------------|---------------------------|-------------|
+| **Q-Learning** | Alta (via recompensa negativa por passo) | Alta (atualização direta do Q-value) | Muito sensível ao *shaping* da função de recompensa. Se a recompensa por passo for muito negativa, o agente pode preferir "morrer cedo" a explorar. |
+| **Algoritmo Genético** | Baixa (só vê fitness no fim) | Alta (fitness = recompensa total) | Não vê recompensas intermédias, apenas o resultado final. Funciona melhor em problemas episódicos com fitness bem definido. |
+| **Política Fixa** | Nenhuma | Nenhuma | Não aprende. O desempenho depende inteiramente da qualidade da heurística programada. |
+
+**Experimentos Realizados:**
+
+1.  **Farol com Recompensa Esparsa (só +99 ao chegar):**
+    - Q-Learning demora muito a convergir porque a recompensa positiva é rara.
+    - Algoritmo Genético funciona bem porque a fitness (chegou ou não) é clara.
+
+2.  **Farol com Reward Shaping (penalidade por passo + bónus por aproximação):**
+    - Q-Learning converge rapidamente porque recebe feedback contínuo.
+    - Algoritmo Genético não beneficia tanto porque não vê as recompensas intermédias.
+
+3.  **Foraging com Múltiplos Recursos:**
+    - Q-Learning aprende a priorizar recursos de maior valor (se a recompensa refletir o valor).
+    - Algoritmo Genético otimiza a recompensa total, mas pode demorar mais a encontrar estratégias sofisticadas.
+
+**Conclusão:**
+A escolha do algoritmo deve considerar:
+- **Q-Learning** é melhor quando a função de recompensa pode ser bem moldada (*reward shaping*) e o espaço de estados é discreto e gerenciável.
+- **Algoritmos Genéticos** são melhores quando a fitness é fácil de calcular no fim do episódio, mas o caminho até lá é complexo ou o espaço de estados é muito grande/contínuo.
+
+---
+
 ## Conclusão
 
 O simulador implementa uma arquitetura modular e extensível que cumpre todos os requisitos do enunciado:
 
-✅ **Interface completa:** Todos os métodos especificados estão implementados  
-✅ **CLI interativo:** Interface amigável para configuração e execução de simulações  
-✅ **Sensores funcionais:** Percepção local e global em ambos os ambientes  
-✅ **Modos distintos:** APRENDIZAGEM e TESTE funcionam corretamente  
-✅ **Threads sincronizadas:** Agentes executam em paralelo com sincronização adequada  
-✅ **Métricas registadas:** Desempenho é medido e pode ser exportado  
-✅ **Geração automática de gráficos:** Análise visual integrada no CLI  
-✅ **Comparação de políticas:** Script para comparar política fixa vs aprendida  
-✅ **Extensibilidade:** Fácil adicionar novos ambientes, agentes e sensores  
+| Requisito do Enunciado | Estado | Implementação |
+|------------------------|--------|---------------|
+| Interface `MotorDeSimulacao` | ✅ | `MotorDeSimulacao` em `simulador.py` com `cria()`, `listaAgentes()`, `executa()` |
+| Interface `Ambiente` | ✅ | `Ambiente` base com `observacaoPara()`, `agir()`, `atualizacao()` |
+| Interface `Agente` | ✅ | `Agente` como thread com `cria()`, `age()`, `observacao()`, `avaliacaoEstadoAtual()`, `instala()`, `comunica()` |
+| Problema Farol | ✅ | `AmbienteFarol` + `AgenteFarol` com obstáculos e direção ao farol |
+| Problema Foraging | ✅ | `AmbienteForaging` + `AgenteForager` com recursos, ninho e carga |
+| Modo APRENDIZAGEM | ✅ | Q-Learning e Algoritmo Genético com registo de métricas |
+| Modo TESTE | ✅ | Avaliação com política fixa (epsilon=0) e carregamento de Q-tables |
+| Threads sincronizadas | ✅ | Agentes como `threading.Thread` com `threading.Barrier` |
+| Visualização | ✅ | `Visualizador` com Tkinter mostrando ambiente, agentes e objetivos |
+| CLI Interativo | ✅ | `cli.py` com questionário guiado e geração automática de gráficos |
+| Comparação de Políticas | ✅ | `comparar_politicas.py` com gráficos lado a lado |
+| Comunicação entre Agentes | ✅ | `enviar_mensagem()` e `broadcast_mensagem()` com fila de mensagens |
 
-A implementação permite que diferentes grupos possam usar ambientes e agentes uns dos outros sem modificações, cumprindo o objetivo de modularidade especificado no enunciado. O CLI interativo torna o simulador acessível tanto para utilizadores experientes quanto para iniciantes, simplificando significativamente o processo de configuração e análise de resultados.
+A implementação permite que diferentes grupos possam usar ambientes e agentes uns dos outros sem modificações, cumprindo o objetivo de modularidade especificado no enunciado.
+
+**Repositório GitHub:** [Link para o repositório]
 
